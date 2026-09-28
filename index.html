@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>The SCAN029 case: well logs, attributes, SOM facies and SHAP</title>
+<title>The SCAN029 case: seismic attributes alongside QI, tested against well logs</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
@@ -126,14 +126,17 @@
     <!-- Logs and crossplots (internal stage 8, shown fourth) -->
     <div class="card" data-for="8" hidden>
       <h2>Logs and crossplots</h2>
+      <p class="small">SCAN029 is a 2D line with relative, not absolute, acoustic impedance. There are no shear or sonic logs and the wells are tied with processing velocities, CAL-GT-04 lies 0.5–1.4 km from the line with gamma ray from the mud log, and most attributes are averaged over 140 m and 62 ms, the scale of seismic facies. There is no inversion, Vp/Vs, intercept or gradient here, so the tool does not compare attributes with QI results; it shows how attributes can be tested against well logs before they are used alongside them.</p>
       <div class="events" id="qiSteps">
-        <button data-qi="1" aria-pressed="false"><b>1. Porosity and one attribute</b><small>Density porosity at ASTEN-GT-02 against RMS amplitude, over the whole logged interval</small></button>
-        <button data-qi="2" aria-pressed="false"><b>2. The same samples, colored by time</b><small>Point color set by two-way time</small></button>
-        <button data-qi="3" aria-pressed="false"><b>3. The trend with time removed</b><small>A straight line in time subtracted from the log and from each attribute</small></button>
-        <button data-qi="4" aria-pressed="false"><b>4. A longer averaging window</b><small>Logs averaged over 62 ms, close to the attribute window</small></button>
-        <button data-qi="5" aria-pressed="false"><b>5. Gamma ray and lithology</b><small>Gamma ray against every attribute, trend removed</small></button>
-        <button data-qi="6" aria-pressed="false"><b>6. Two attributes, colored by gamma ray</b><small>A polygon drawn on the crossplot marks the same attribute combination along the whole line</small></button>
-        <button data-qi="7" aria-pressed="false"><b>7. The Houthem Formation</b><small>Samples from the Houthem Formation only, at ASTEN-GT-02 and CAL-GT-04</small></button>
+        <button data-qi="1" aria-pressed="false"><b>1. Zeeland against Epen at CAL-GT-04</b><small>The producing carbonate and the shale above it, split by a gamma ray cutoff, and the attributes that measure interval character separating them</small></button>
+        <button data-qi="2" aria-pressed="false"><b>2. Lithology or depth?</b><small>The same samples with a straight-line trend with time removed from gamma ray and from each attribute</small></button>
+        <button data-qi="3" aria-pressed="false"><b>3. Gamma ray classes from the Someren to the Boom members</b><small>ASTEN-GT-02, where gamma ray changes little with time; the cutoff slider sets the classes</small></button>
+        <button data-qi="4" aria-pressed="false"><b>4. Porosity over the whole logged interval</b><small>Density porosity against RMS amplitude, colored by two-way time; the averaging window slider changes the scale of the logs</small></button>
+        <button data-qi="5" aria-pressed="false"><b>5. Porosity with the trend removed</b><small>The same samples after a straight-line trend with time is subtracted</small></button>
+        <button data-qi="6" aria-pressed="false"><b>6. The well tie</b><small>Logs and tops moved 8 ms down; the tie shift slider moves them up to 16 ms either way</small></button>
+        <button data-qi="7" aria-pressed="false"><b>7. Two attributes and a polygon</b><small>Spectral ratio against far minus near, colored by class; a polygon marks the same combination along the whole line</small></button>
+        <button data-qi="8" aria-pressed="false"><b>8. Attributes chosen at the well, into the SOM</b><small>The four attributes that separate the classes most, skipping near-duplicates, go to Build a SOM</small></button>
+        <button data-qi="9" aria-pressed="false"><b>9. The Houthem Formation</b><small>The target at both wells, where the logs run out</small></button>
       </div>
       <div class="seg qi-seg" role="group" aria-label="Well" id="qiWell">
         <button data-well="ASTEN-GT-02" aria-pressed="true">ASTEN-GT-02</button><button data-well="CAL-GT-04" aria-pressed="false">CAL-GT-04</button>
@@ -148,8 +151,14 @@
       <label class="field" data-mode="log">Point color <select id="qiColor"></select></label>
       <label class="field" data-mode="attr" hidden>Point color: log <select id="qiColorLog"></select></label>
       <label class="field">Samples from <select id="qiUnit"></select></label>
+      <div id="qiCutRow" hidden>
+        <label class="field">Gamma ray cutoff: <span id="qiCutText"></span> <button class="term" data-term="grcut">classes</button>
+          <input type="range" id="qiCut" min="0" max="200" step="5" value="65"></label>
+      </div>
       <label class="field">Log averaging window: <span id="qiWinText"></span> <button class="term" data-term="blocking">averaging</button>
         <input type="range" id="qiWin" min="0" max="5" step="1" value="0"></label>
+      <label class="field">Tie shift: <span id="qiShiftText">0 ms</span> <button class="term" data-term="tieShift">tie</button>
+        <input type="range" id="qiShift" min="-16" max="16" step="2" value="0"></label>
       <label data-mode="log"><input type="checkbox" id="qiDetrend"> Remove the trend with time <button class="term" data-term="detrend">trend</button></label>
       <div data-mode="attr" hidden>
         <p class="small">Click on the crossplot to add polygon corners; click the first corner again to close it.</p>
@@ -158,9 +167,10 @@
       </div>
       <label class="dqWiggle8" hidden><input type="checkbox" class="wiggleToggle" checked> DQ wiggles, unfilled</label>
       <label class="field">Overlay opacity <input type="range" id="qiOpacity" min="0" max="1" step="0.05" value="0.75"></label>
-      <h3 id="qiCorrTitle">Correlation with the log</h3><button class="term help" data-term="helpQiCorr">Help me read this plot</button>
+      <p class="small">Bars are colored by <button class="term" data-term="attrGroups">what each attribute measures</button>.</p>
+      <h3 id="qiCorrTitle">Correlation with the log</h3><button class="term help" id="qiCorrHelp" data-term="helpQiCorr">Help me read this plot</button>
       <canvas id="qiCorr" width="268" height="360" aria-label="Correlation coefficient of every attribute with the chosen log"></canvas>
-      <p class="small">Correlation coefficient <button class="term" data-term="correlation">r</button> for the samples on the crossplot. Axis fixed at −1 to 1. Clicking a bar puts that attribute on the horizontal axis.</p>
+      <p class="small" id="qiCorrNote"></p>
       <button class="big" id="qiToSom">Use the crossplot attributes in the SOM</button>
       <p class="small" id="qiToSomInfo"></p>
       <p class="small"><button class="term help" data-term="helpWellPanel">Reading the well panel</button><button class="term help" data-term="helpXplot">Reading the crossplot</button></p>

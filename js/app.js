@@ -24,6 +24,11 @@
     correlation: ["Correlation coefficient (r)", "Pearson correlation between two quantities over a set of samples, from −1 to 1. Its square is the fraction of the variance of one quantity that a straight line through the points accounts for. With few samples r changes a lot from one set of samples to the next, so it is not computed for fewer than five samples."],
     helpWellPanel: ["Reading the well panel", "Two-way time runs down the panel, with measured depth on the left and two-way time on the right; the two scales are not proportional because velocity increases with depth. The first column shows the formations from the well tops, with an asterisk on candidate geothermal reservoirs. In each log track the thin gray curve is the log in 1 ms samples and the colored curve is the same log averaged over the chosen window at each 4 ms attribute sample. On the porosity track, density porosity is the solid curve and neutron porosity the dashed one. The last tracks show the attribute values along the well path, the values that go into the crossplot. Moving over the panel marks the same sample on the crossplot and on the section."],
     helpXplot: ["Reading the crossplot", "Each point is one 4 ms sample along the well: its attribute value across and its log value up, or, with two attributes, both attribute values with the log as the point color. The axes are fixed for each quantity, so changing the averaging window or the interval moves the points and not the axes. The dashed line is the least-squares straight line through the points, and n and r are given above the plot. In the two-attribute view the gray shading shows how often each attribute combination occurs along the line in the study window, darker where it is more common, so the well samples can be compared with the whole line. A closed polygon marks every sample on the section whose two attribute values fall inside it."],
+    grcut: ["Gamma ray classes", "Gamma ray measures the natural radioactivity of the rock, most of it from potassium, thorium and uranium in clay minerals. Samples are split at the cutoff into two classes: gamma ray below the cutoff, often sand or carbonate, and gamma ray at or above it, often clay or shale. The split uses the gamma ray averaged over the chosen window at each 4 ms attribute sample. The cutoff sets where the boundary between the classes falls, so moving it changes which samples are in each class."],
+    separation: ["Separation in standard deviations", "For each attribute, the mean of the high gamma ray class minus the mean of the low gamma ray class, divided by the pooled standard deviation of the two classes (Cohen's d). A value near zero means the two classes take similar attribute values; a value of 2 or more means their distributions barely overlap. The sign gives which class has the higher values. It is not computed when either class has fewer than five samples."],
+    helpQiSep: ["Reading the separation bars", "One bar per attribute: how far apart that attribute places the low and high gamma ray classes, in standard deviations, for the same well, interval, averaging window and trend setting as the crossplot. A bar to the right means the attribute is higher in the high gamma ray class; a bar to the left means it is lower. The red bar is the attribute on the horizontal axis. Moving the cutoff changes which samples are in each class, and so which attributes separate them."],
+    tieShift: ["Tie shift", "Neither well has a sonic log or checkshot, so the logs and formation tops are placed in two-way time with velocities from the seismic processing, and the tie between log and seismic can be off by several milliseconds. The slider moves the logs and tops down (positive) or up (negative) against the seismic, and the well panel, crossplot and bars use the moved logs. A result that changes a lot over a few milliseconds of shift depends on the tie."],
+    attrGroups: ["What each group of attributes measures", "The bars are colored by what each attribute measures. Waveform attributes (blue: the stack amplitudes, relative acoustic impedance, AVT, the quadrature trace and the phase attributes) follow the oscillation of the trace between peaks and troughs, or are band-limited with no low frequencies, so their average over an interval is close to zero whatever the rock, and two classes rarely differ in their mean values. Quantitative interpretation reaches the properties of an interval from the same data by inversion with a low-frequency model, which this tool does not do. Envelope and energy attributes (brown: RMS amplitude, envelope, sweetness), amplitude change with angle measured on envelopes (purple: far minus near), frequency attributes (teal: instantaneous frequency, spectral ratio), geometric attributes (gray: dip, dip variability, coherence) and the DQ attributes (rose) each turn the waveform into a measure of the character of an interval, so their averages can differ from one rock to another."],
     helpQiCorr: ["Reading the correlation bars", "One bar per attribute: the correlation coefficient between that attribute and the log, for the same well, interval, averaging window and trend setting as the crossplot. A bar to the right means the attribute tends to be higher where the log is higher; a bar to the left means it tends to be lower. The red bar is the attribute on the horizontal axis. Switching the trend setting on and off shows which correlations come from both quantities changing with two-way time."],
     zscore: ["Standard deviations", "Each attribute is rescaled by subtracting its mean and dividing by its standard deviation over the whole window, so attributes with different units can be compared."],
     shap: ["SHAP values", "Shapley additive explanations (Lundberg and Lee, 2017). For one sample, each attribute receives the change it makes to the model output, averaged over the orders in which attributes can be added. Here the output is the sample's position on the SOM grid, which sets its color. The average position of all samples plus every attribute's SHAP value gives the sample's position. Values are estimated from random attribute orderings (Strumbelj and Kononenko, 2014)."],
@@ -33,7 +38,8 @@
     stage: 1, zoom: "study", showWell: true, showHorizons: false, showUnits: false, seisMap: "gray_black", attrLut: "default", showInterp: true, hideControl: false,
     attr: "coherence", attrOpacity: 0.75, somOpacity: 0.75, verdictOpacity: 0.55, sample: null, explained: null, traceKm: 34.19,
     wiggles: true, wiggleGain: 1, wigglePx: 12,
-    qi: { well: "ASTEN-GT-02", mode: "log", x: "rms_amplitude", y: "PHID", y2: "far_minus_near", color: "unit", colorLog: "GR", win: 0, detrend: false, unit: "all", poly: [], closed: false, hover: null, version: 0 },
+    qi: { well: "ASTEN-GT-02", mode: "log", x: "rms_amplitude", y: "PHID", y2: "far_minus_near", color: "unit", colorLog: "GR", win: 0, detrend: false, unit: "all", poly: [], closed: false, hover: null, version: 0,
+      cuts: { "ASTEN-GT-02": 65, "CAL-GT-04": 75 }, shift: 0 },
     runs: [], current: -1, busy: false, picked: new Set(), neurons: 6, somArea: "study", somT: [0.15, 2.0], zoomT: null, drag: null, compare: false, compareMode: "off", runA: 0, runB: 1, wipe: 0.5, compareCache: {}, showGeoColumns: true, geoFocus: null, showSomeren: true, showNames: true, showKarst: true, showFault: true, hiddenWells: new Set(),
   };
 
@@ -896,18 +902,33 @@
   const winMs = () => QI_WINDOWS[state.qi.win];
   const qw = () => logs.wells.find((w) => w.name === state.qi.well);
   const gridT = (j) => meta.t_min + j * meta.grid.dt;
-  const unitAt = (w, t) => w.units.find((u) => t >= u.top_twt && t < u.base_twt) || null;
+  const sh = () => state.qi.shift / 1000;   // tie shift: logs and tops moved down (positive) or up against the seismic, in s
+  const unitAt = (w, t) => w.units.find((u) => t - sh() >= u.top_twt && t - sh() < u.base_twt) || null;
   const unitShort = (n) => n.replace(" Formation", " Fm").replace(" Member", " Mbr").replace(" (undifferentiated)", "");
+  // groups of adjacent units offered as one interval: [label, top unit, base unit]
+  const PACKAGES = { "ASTEN-GT-02": [["Someren Mbr to Boom Mbr", "Someren Member", "Boom Member"]], "CAL-GT-04": [["Epen Fm to Zeeland Fm", "Epen Formation", "Zeeland Formation"]] };
+  function intervalOf(w, sel) {   // time range of the chosen interval, or null for the whole logged interval
+    if (sel === "all") return null;
+    if (sel.startsWith("pkg:")) {
+      const p = (PACKAGES[w.name] || [])[+sel.slice(4)]; if (!p) return null;
+      const a = w.units.find((u) => u.name === p[1]), b = w.units.find((u) => u.name === p[2]);
+      return a && b ? { top: a.top_twt + sh(), base: b.base_twt + sh(), label: p[0] } : null;
+    }
+    const u = w.units.find((v) => v.name === sel); return u ? { top: u.top_twt + sh(), base: u.base_twt + sh(), label: unitShort(u.name) } : null;
+  }
+  const CLASS_COLORS = ["#e9b949", "#2f5d62"];   // gamma ray below the cutoff, at or above it
+  const classOn = () => (state.qi.mode === "log" ? state.qi.color : state.qi.colorLog) === "class";
+  const cutNow = () => state.qi.cuts[state.qi.well];
   const lutColor = (lut, u) => lut[Math.max(0, Math.min(255, Math.round(u * 255)))];
   const CURVE_COLOR = { GR: "#2a9d8f", PHID: "#c8362d", NPHI: "#3a6ea5", RHOB: "#6d597a", TEMP: "#e76f51", DRILL: "#8d6e63" };
 
   function blockedCurve(w, key) {   // the log averaged over the chosen window at each 4 ms attribute sample along the well
-    const id = `${w.name}:${key}:${winMs()}`; blockedCurve.c ??= {};
+    const id = `${w.name}:${key}:${winMs()}:${state.qi.shift}`; blockedCurve.c ??= {};
     if (blockedCurve.c[id]) return blockedCurve.c[id];
     const c = w.curves[key]; if (!c) return null;
     const v = c.values, n = v.length, m = winMs();
     const out = w.grid.j.map((j) => {
-      const t = gridT(j), k0 = Math.round((t - m / 2000 - w.t0) / w.dt);
+      const t = gridT(j) - sh(), k0 = Math.round((t - m / 2000 - w.t0) / w.dt);
       let s = 0, cnt = 0;
       for (let k = Math.max(0, k0); k < Math.min(n, k0 + m); k++) if (v[k] != null) { s += v[k]; cnt++; }
       return cnt >= Math.max(2, m / 2) ? s / cnt : null;
@@ -931,15 +952,16 @@
   function qiSamples(xKey = state.qi.x, q = state.qi) {
     const w = qw(), g = w.grid, xs = g.attrs[xKey];
     const ys = q.mode === "log" ? blockedCurve(w, q.y) : g.attrs[q.y2];
-    const cKey = q.mode === "attr" ? q.colorLog : q.color, cs = w.curves[cKey] ? blockedCurve(w, cKey) : null;
+    const cKey = q.mode === "attr" ? q.colorLog : q.color, byClass = cKey === "class";
+    const cs = byClass ? blockedCurve(w, "GR") : w.curves[cKey] ? blockedCurve(w, cKey) : null, cut = q.cuts[w.name], iv = intervalOf(w, q.unit);
     const out = [];
     g.j.forEach((j, k) => {
       const t = gridT(j), u = unitAt(w, t);
-      if (q.unit !== "all" && (!u || u.name !== q.unit)) return;
+      if (iv && (t < iv.top || t >= iv.base)) return;
       const x = xs[k], y = ys ? ys[k] : null, c = cs ? cs[k] : null;
       if (x == null || y == null) return;
-      if (q.mode === "attr" && c == null) return;
-      out.push({ k, j, t, km: g.km[k], x, y, x0: x, y0: y, c, u });
+      if ((q.mode === "attr" || byClass) && c == null) return;
+      out.push({ k, j, t, km: g.km[k], x, y, x0: x, y0: y, c, u, cls: byClass ? (c >= cut ? 1 : 0) : null });
     });
     if (q.mode === "log" && q.detrend && out.length > 2) {
       for (const key of ["x", "y"]) { const f = fitLine(out, key); out.forEach((p) => (p[key] -= f(p.t))); }
@@ -1034,6 +1056,7 @@
     const cKey = q.mode === "attr" ? q.colorLog : q.color, curve = well.curves[cKey], vir = meta.luts.viridis.lut;
     const tRange = [well.t0, well.t0 + well.n * well.dt];
     const colorOf = (p) => {
+      if (p.cls != null) return CLASS_COLORS[p.cls];
       if (q.mode === "log" && q.color === "unit") return p.u ? p.u.color : "#999";
       if (q.mode === "log" && q.color === "twt") return `rgb(${lutColor(vir, (p.t - tRange[0]) / (tRange[1] - tRange[0]))})`;
       return p.c == null ? "#bbb" : `rgb(${lutColor(vir, (p.c - curve.min) / (curve.max - curve.min))})`;
@@ -1080,10 +1103,16 @@
     g.save(); g.translate(14, (XP.t + h - XP.b) / 2); g.rotate(-Math.PI / 2); g.textBaseline = "middle"; g.fillText(yl, 0, 0); g.restore();
     // n, r and the color key
     g.textAlign = "left"; g.textBaseline = "middle"; g.font = "700 13px Barlow, Arial, sans-serif";
-    const where = q.unit === "all" ? "logged interval" : unitShort(q.unit);
+    const iv = intervalOf(well, q.unit), where = iv ? iv.label : "logged interval";
     const rTxt = r == null ? "r not computed for fewer than 5 samples" : `r = ${r.toFixed(2)}`;
     g.fillText(`${well.name}, ${where}: n = ${pts.length}, ${rTxt}${q.mode === "attr" && r != null ? " between the two attributes" : ""}`, 8, 12);
-    if (!(q.mode === "log" && q.color === "unit")) {
+    if (classOn()) {   // class key
+      const n1 = pts.filter((p) => p.cls === 1).length, lab = [`Gamma ray below ${cutNow()} API (${pts.length - n1})`, `${cutNow()} API or more (${n1})`];
+      g.font = "11.5px Barlow, Arial, sans-serif"; g.textBaseline = "middle"; g.textAlign = "left";
+      let xx = w - XP.r - lab.reduce((a, l) => a + g.measureText(l).width + 26, 0);
+      lab.forEach((l, i) => { g.fillStyle = CLASS_COLORS[i]; g.beginPath(); g.arc(xx + 5, 31, 5, 0, Math.PI * 2); g.fill(); g.strokeStyle = "#1f1d18"; g.lineWidth = 0.7; g.stroke();
+        g.fillStyle = "#1f1d18"; g.fillText(l, xx + 13, 31); xx += g.measureText(l).width + 26; });
+    } else if (!(q.mode === "log" && q.color === "unit")) {
       const bw = 110, x0 = w - XP.r - bw - 34, y0 = 27;
       for (let i = 0; i < bw; i++) { g.fillStyle = `rgb(${lutColor(vir, i / (bw - 1))})`; g.fillRect(x0 + i, y0, 1.5, 8); }
       g.font = "11px Barlow, Arial, sans-serif"; g.fillStyle = "#1f1d18"; g.textBaseline = "middle";
@@ -1110,15 +1139,16 @@
   function drawWellPanel() {
     const c = $("#wellPanel"), s = sizeCanvas(c); if (!s) return;
     const { g, w, h } = s, q = state.qi, well = qw(), L = 50, R = 42, T = 60, B = 10;
-    const t0 = well.t0, t1 = well.t0 + well.n * well.dt, Y = (t) => T + (t - t0) / (t1 - t0) * (h - T - B);
+    const t0 = well.t0, t1 = well.t0 + well.n * well.dt, Y = (t) => T + (t - t0) / (t1 - t0) * (h - T - B), Yw = (t) => Y(t + sh());   // Yw: well-derived items, moved by the tie shift
     g.fillStyle = "#fffaf0"; g.fillRect(0, 0, w, h);
     const tracks = wellTracks(well), tot = tracks.reduce((a, t) => a + (t.w || 1), 0), gap = 6, tw = (w - L - R - gap * (tracks.length - 1)) / tot;
     let x = L;
     tracks.forEach((t) => { t.x0 = x; t.x1 = x + tw * (t.w || 1); x = t.x1 + gap; });
     // selected interval and guide lines at the tops, across every track
-    if (q.unit !== "all") { const u = well.units.find((v) => v.name === q.unit); if (u) { g.fillStyle = "rgba(255,209,102,.35)"; g.fillRect(L, Y(Math.max(u.top_twt, t0)), w - L - R, Y(Math.min(u.base_twt, t1)) - Y(Math.max(u.top_twt, t0))); } }
+    const ivw = intervalOf(well, q.unit);
+    if (ivw) { g.fillStyle = "rgba(255,209,102,.35)"; g.fillRect(L, Y(Math.max(ivw.top, t0)), w - L - R, Y(Math.min(ivw.base, t1)) - Y(Math.max(ivw.top, t0))); }
     g.lineWidth = 1;
-    for (const u of well.units) if (u.top_twt > t0 && u.top_twt < t1) { g.strokeStyle = "rgba(90,84,70,.45)"; g.beginPath(); g.moveTo(L, Y(u.top_twt)); g.lineTo(w - R, Y(u.top_twt)); g.stroke(); }
+    for (const u of well.units) if (u.top_twt + sh() > t0 && u.top_twt + sh() < t1) { g.strokeStyle = "rgba(90,84,70,.45)"; g.beginPath(); g.moveTo(L, Yw(u.top_twt)); g.lineTo(w - R, Yw(u.top_twt)); g.stroke(); }
     g.font = "11px Barlow, Arial, sans-serif";
     for (const t of tracks) {
       g.strokeStyle = "#5a5446"; g.strokeRect(t.x0, T, t.x1 - t.x0, h - T - B);
@@ -1127,10 +1157,15 @@
         g.fillText("Formation", (t.x0 + t.x1) / 2, T - 8);
         g.save(); g.beginPath(); g.rect(t.x0, T, t.x1 - t.x0, h - T - B); g.clip();
         for (const u of well.units) {
-          const a = Y(Math.max(u.top_twt, t0)), b = Y(Math.min(u.base_twt, t1));
-          g.fillStyle = u.color; g.globalAlpha = q.unit === "all" || q.unit === u.name ? 0.85 : 0.3; g.fillRect(t.x0, a, t.x1 - t.x0, b - a); g.globalAlpha = 1;
+          const a = Y(Math.max(u.top_twt + sh(), t0)), b = Y(Math.min(u.base_twt + sh(), t1));
+          g.fillStyle = u.color; g.globalAlpha = !ivw || (u.top_twt + sh() < ivw.base && u.base_twt + sh() > ivw.top) ? 0.85 : 0.3; g.fillRect(t.x0, a, t.x1 - t.x0, b - a); g.globalAlpha = 1;
           if (b - a > 11) { g.fillStyle = "#10151a"; g.font = `${u.target ? 700 : 500} 10px Barlow, Arial, sans-serif`; g.textAlign = "left"; g.textBaseline = "middle";
             g.fillText(unitShort(u.name) + (u.target ? " *" : ""), t.x0 + 3, (a + b) / 2, t.x1 - t.x0 - 5); }
+        }
+        if (classOn() && well.curves.GR) {   // gamma ray class of each attribute sample, as a strip on the right of the column
+          const gr = blockedCurve(well, "GR"), cut = cutNow(), sw = 9;
+          well.grid.j.forEach((j, i) => { if (gr[i] == null) return; const tt = gridT(j); g.fillStyle = CLASS_COLORS[gr[i] >= cut ? 1 : 0]; g.fillRect(t.x1 - sw, Y(tt - 0.002), sw, Math.max(1, Y(tt + 0.002) - Y(tt - 0.002))); });
+          g.strokeStyle = "#1f1d18"; g.lineWidth = 0.6; g.beginPath(); g.moveTo(t.x1 - sw, T); g.lineTo(t.x1 - sw, h - B); g.stroke();
         }
         g.restore(); g.font = "11px Barlow, Arial, sans-serif"; continue;
       }
@@ -1145,11 +1180,14 @@
       for (const k of keys) {
         if (t.type === "curve") {   // the log in 1 ms samples, thin and gray
           const v = well.curves[k].values; g.strokeStyle = "rgba(90,84,70,.35)"; g.lineWidth = 0.8; g.beginPath(); let on = false;
-          v.forEach((val, i) => { if (val == null) { on = false; return; } const yy = Y(t0 + i * well.dt); on ? g.lineTo(XV(val), yy) : g.moveTo(XV(val), yy); on = true; }); g.stroke();
+          v.forEach((val, i) => { if (val == null) { on = false; return; } const yy = Yw(t0 + i * well.dt); on ? g.lineTo(XV(val), yy) : g.moveTo(XV(val), yy); on = true; }); g.stroke();
         }
         const vals = t.type === "attr" ? well.grid.attrs[k] : blockedCurve(well, k);
         g.strokeStyle = t.type === "attr" ? "#1f1d18" : CURVE_COLOR[k]; g.lineWidth = 1.8; g.setLineDash(k === "NPHI" ? [5, 3] : []); g.beginPath(); let on = false;
         well.grid.j.forEach((j, i) => { const val = vals[i]; if (val == null) { on = false; return; } const yy = Y(gridT(j)); on ? g.lineTo(XV(val), yy) : g.moveTo(XV(val), yy); on = true; }); g.stroke(); g.setLineDash([]);
+      }
+      if (classOn() && keys.includes("GR")) {   // the cutoff on the gamma ray track
+        g.strokeStyle = "#9d0208"; g.lineWidth = 1.4; g.setLineDash([5, 3]); g.beginPath(); g.moveTo(XV(cutNow()), T); g.lineTo(XV(cutNow()), h - B); g.stroke(); g.setLineDash([]);
       }
       g.restore();
     }
@@ -1157,7 +1195,7 @@
     g.fillStyle = "#1f1d18"; g.font = "11px Barlow, Arial, sans-serif"; g.textBaseline = "middle";
     const px100 = well.depth_ticks.length > 1 ? Math.abs(Y(well.depth_ticks[1].twt) - Y(well.depth_ticks[0].twt)) : 99, every = px100 > 13 ? 100 : px100 > 6 ? 200 : 500;
     g.textAlign = "right";
-    for (const d of well.depth_ticks) if (d.md % every === 0 && d.twt >= t0 && d.twt <= t1) { g.fillRect(L - 4, Y(d.twt), 4, 1); g.fillText(String(d.md), L - 6, Y(d.twt)); }
+    for (const d of well.depth_ticks) if (d.md % every === 0 && d.twt + sh() >= t0 && d.twt + sh() <= t1) { g.fillRect(L - 4, Yw(d.twt), 4, 1); g.fillText(String(d.md), L - 6, Yw(d.twt)); }
     g.textAlign = "left";
     for (let t = Math.ceil(t0 * 20) / 20; t <= t1 + 1e-9; t += 0.05) { g.fillRect(w - R, Y(t), 4, 1); g.fillText(t.toFixed(2), w - R + 6, Y(t)); }
     g.save(); g.font = "600 11px Barlow, Arial, sans-serif"; g.textAlign = "center";
@@ -1166,22 +1204,55 @@
     g.translate(w - 8, (T + h - B) / 2); g.rotate(Math.PI / 2); g.fillText("Two-way time (s)", 0, 0); g.restore();
     g.font = "700 12px Barlow, Arial, sans-serif"; g.textAlign = "left"; g.textBaseline = "top"; g.fillStyle = "#1f1d18";
     const off = well.grid.offset_m, offTxt = Math.max(...off) - Math.min(...off) < 50 ? `${(off[0] / 1000).toFixed(1)} km` : `${(Math.min(...off) / 1000).toFixed(1)}–${(Math.max(...off) / 1000).toFixed(1)} km`;
-    g.fillText(`${well.name}, ${offTxt} from the line · log average ${winMs()} ms`, 6, 3);
+    g.fillText(`${well.name}, ${offTxt} from the line · log average ${winMs()} ms${state.qi.shift ? ` · tie shift ${state.qi.shift > 0 ? "+" : ""}${state.qi.shift} ms` : ""}`, 6, 3);
     if (q.hover && q.hover.well === well.name) { const yy = Y(q.hover.t); g.strokeStyle = "#e63946"; g.lineWidth = 1.6; g.beginPath(); g.moveTo(L, yy); g.lineTo(w - R, yy); g.stroke(); }
     wellGeom = { Y, t0, t1, T, B, h };
   }
 
   /* ---------- the correlation bars ---------- */
   const ATTR_ORDER = () => Object.keys(meta.attributes);
+  // bar colors by what each attribute measures
+  const ATTR_GROUPS = [
+    ["Waveform", "#3a6ea5", ["full_stack_amplitude", "near_stack_amplitude", "mid_stack_amplitude", "far_stack_amplitude", "relative_acoustic_impedance", "amplitude_volume_transform", "quadrature_trace", "instantaneous_phase", "cos_instantaneous_phase"]],
+    ["Envelope and energy", "#8c5a2b", ["rms_amplitude", "envelope", "sweetness"]],
+    ["Amplitude with angle", "#6d597a", ["far_minus_near"]],
+    ["Frequency", "#2a9d8f", ["instantaneous_frequency", "spectral_ratio"]],
+    ["Geometry", "#7a7a7a", ["apparent_dip", "dip_variability", "coherence"]],
+    ["DQ", "#b5838d", ["dq", "theta_px", "dq_layer_average", "dq_layer_sum", "signed_isochron", "signed_half_isochron"]],
+  ];
+  const groupColor = (k) => (ATTR_GROUPS.find((g) => g[2].includes(k)) || [0, "#5a5446"])[1];
+  const barColor = (k) => (k === state.qi.x ? "#be2d28" : groupColor(k));
+  const BAR_KEY = " Red: the attribute on the horizontal axis. Other colors: " + ATTR_GROUPS.map(([n, c]) => `<span style="color:${c};font-weight:600">${n === "DQ" ? n : n.toLowerCase()}</span>`).join(", ") + ' (<button class="term" data-term="attrGroups">what each group measures</button>).';
   let corrRows = [];
   function drawQiCorr() {
     const q = state.qi, well = qw(), c = $("#qiCorr");
-    const logKey = q.mode === "log" ? q.y : q.colorLog, o = { ...q, mode: "log", y: logKey, detrend: q.mode === "log" && q.detrend };
+    const iv = intervalOf(well, q.unit), where = iv ? iv.label : "logged interval", tr = q.mode === "log" && q.detrend;
+    if (classOn()) {
+      // separation of the two gamma ray classes by each attribute: difference of the class means in pooled standard deviations
+      const o = { ...q, mode: "log", y: "GR", color: "class", detrend: tr };
+      corrRows = ATTR_ORDER().map((k) => {
+        const pts = qiSamples(k, o), a = pts.filter((p) => p.cls === 0).map((p) => p.x), b = pts.filter((p) => p.cls === 1).map((p) => p.x);
+        if (a.length < 5 || b.length < 5) return [k, null];
+        const m = (v) => v.reduce((x, y) => x + y, 0) / v.length, va = (v, mm) => v.reduce((x, y) => x + (y - mm) ** 2, 0) / (v.length - 1);
+        const ma = m(a), mb = m(b), sd = Math.sqrt((va(a, ma) + va(b, mb)) / 2);
+        return [k, sd ? (mb - ma) / sd : null];
+      });
+      $("#qiCorrTitle").textContent = `Separation of the gamma ray classes${tr ? ", trend removed" : ""}`;
+      $("#qiCorrNote").innerHTML = 'Difference between the class means in <button class="term" data-term="separation">standard deviations</button>, for the samples on the crossplot. Axis fixed at −3 to 3. Clicking a bar puts that attribute on the horizontal axis.' + BAR_KEY;
+      $("#qiCorrHelp").dataset.term = "helpQiSep";
+      c.height = 26 + 18 * corrRows.length;
+      hbars(c, corrRows.map(([k]) => shortName(k)), corrRows.map(([, r]) => (r == null ? NaN : r)),
+        { min: -3, max: 3, colors: corrRows.map(([k]) => barColor(k)), valueFmt: (v) => (Number.isNaN(v) ? "n < 5" : v.toFixed(2)), labelOpposite: true, title: `${where}, cutoff ${cutNow()} API` });
+      return;
+    }
+    const logKey = q.mode === "log" ? q.y : q.colorLog, o = { ...q, mode: "log", y: logKey, detrend: tr };
     corrRows = ATTR_ORDER().map((k) => [k, corr(qiSamples(k, o))]);
-    $("#qiCorrTitle").textContent = `Correlation with ${well.curves[logKey].label.toLowerCase()}${q.mode === "log" && q.detrend ? ", trend removed" : ""}`;
+    $("#qiCorrTitle").textContent = `Correlation with ${well.curves[logKey].label.toLowerCase()}${tr ? ", trend removed" : ""}`;
+    $("#qiCorrNote").innerHTML = 'Correlation coefficient <button class="term" data-term="correlation">r</button> for the samples on the crossplot. Axis fixed at −1 to 1. Clicking a bar puts that attribute on the horizontal axis.' + BAR_KEY;
+    $("#qiCorrHelp").dataset.term = "helpQiCorr";
     c.height = 26 + 18 * corrRows.length;
     hbars(c, corrRows.map(([k]) => shortName(k)), corrRows.map(([, r]) => (r == null ? NaN : r)),
-      { min: -1, max: 1, colors: corrRows.map(([k]) => (k === q.x ? "#be2d28" : "#5a5446")), valueFmt: (v) => (Number.isNaN(v) ? "n < 5" : v.toFixed(2)), labelOpposite: true, title: `${well.name}, ${q.unit === "all" ? "logged interval" : unitShort(q.unit)}, ${winMs()} ms` });
+      { min: -1, max: 1, colors: corrRows.map(([k]) => barColor(k)), valueFmt: (v) => (Number.isNaN(v) ? "n < 5" : v.toFixed(2)), labelOpposite: true, title: `${well.name}, ${where}, ${winMs()} ms` });
   }
 
   function drawQiLegend() {
@@ -1198,6 +1269,8 @@
   async function drawQi() {
     if (state.stage !== 8 || !logs) return;
     $("#qiWinText").textContent = `${winMs()} ms`;
+    $("#qiCutRow").hidden = !classOn(); $("#qiCut").value = cutNow(); $("#qiCutText").textContent = `${cutNow()} API`;
+    $("#qiShift").value = state.qi.shift; $("#qiShiftText").textContent = state.qi.shift ? `${state.qi.shift > 0 ? "+" : ""}${state.qi.shift} ms, logs and tops moved ${state.qi.shift > 0 ? "down" : "up"}` : "0 ms";
     $("#qiPolyInfo").textContent = state.qi.closed && qiMaskInfo ? `${(qiMaskInfo.share * 100).toFixed(1)}% of the samples in the study window (0–40 km, 0.15–2.0 s) fall inside the polygon, shown in yellow on the section.` : "";
     drawWellPanel(); drawQiCorr(); drawQiLegend(); await drawXplot();
   }
@@ -1205,17 +1278,19 @@
   function fillQiSelects() {
     const q = state.qi, well = qw(), curves = Object.entries(well.curves);
     if (!well.curves[q.y]) q.y = "GR";
-    if (!well.curves[q.colorLog]) q.colorLog = "GR";
-    if (q.color !== "unit" && q.color !== "twt" && !well.curves[q.color]) q.color = "unit";
+    if (q.colorLog !== "class" && !well.curves[q.colorLog]) q.colorLog = "GR";
+    if (!["unit", "twt", "class"].includes(q.color) && !well.curves[q.color]) q.color = "unit";
     const opt = (v, t) => Object.assign(document.createElement("option"), { value: v, textContent: t });
     const ySel = $("#qiY"), cSel = $("#qiColor"), clSel = $("#qiColorLog"), uSel = $("#qiUnit");
     ySel.innerHTML = ""; clSel.innerHTML = ""; cSel.innerHTML = ""; uSel.innerHTML = "";
     for (const [k, cv] of curves) { ySel.append(opt(k, `${cv.label} (${cv.unit})`)); clSel.append(opt(k, `${cv.label} (${cv.unit})`)); }
-    cSel.append(opt("unit", "Formation"), opt("twt", "Two-way time"));
+    clSel.append(opt("class", "Gamma ray class (cutoff)"));
+    cSel.append(opt("unit", "Formation"), opt("twt", "Two-way time"), opt("class", "Gamma ray class (cutoff)"));
     for (const [k, cv] of curves) cSel.append(opt(k, cv.label));
     uSel.append(opt("all", "Whole logged interval"));
+    (PACKAGES[well.name] || []).forEach((p, i) => uSel.append(opt(`pkg:${i}`, p[0])));
     for (const u of well.units) uSel.append(opt(u.name, unitShort(u.name) + (u.target ? " *" : "")));
-    if (q.unit !== "all" && !well.units.some((u) => u.name === q.unit)) q.unit = "all";
+    if (!intervalOf(well, q.unit)) q.unit = "all";
     ySel.value = q.y; cSel.value = q.color; clSel.value = q.colorLog; uSel.value = q.unit;
   }
 
@@ -1231,14 +1306,37 @@
   function qiChanged() { syncQiControls(); refresh(); }
 
   const QI_STEPS = {
-    1: { well: "ASTEN-GT-02", mode: "log", x: "rms_amplitude", y: "PHID", color: "unit", win: 0, detrend: false, unit: "all", zoom: "someren" },
-    2: { well: "ASTEN-GT-02", mode: "log", x: "rms_amplitude", y: "PHID", color: "twt", win: 0, detrend: false, unit: "all" },
-    3: { well: "ASTEN-GT-02", mode: "log", x: "rms_amplitude", y: "PHID", color: "twt", win: 0, detrend: true, unit: "all" },
-    4: { well: "ASTEN-GT-02", mode: "log", x: "rms_amplitude", y: "PHID", color: "twt", win: 5, detrend: false, unit: "all" },
-    5: { well: "ASTEN-GT-02", mode: "log", x: "rms_amplitude", y: "GR", color: "unit", win: 0, detrend: true, unit: "all" },
-    6: { well: "ASTEN-GT-02", mode: "attr", x: "rms_amplitude", y2: "far_minus_near", colorLog: "GR", win: 0, unit: "all", zoom: "study" },
-    7: { well: "ASTEN-GT-02", mode: "log", x: "rms_amplitude", y: "GR", color: "unit", win: 0, detrend: false, unit: "Houthem Formation" },
+    1: { well: "CAL-GT-04", mode: "log", x: "instantaneous_frequency", y: "GR", color: "class", cut: 75, win: 0, detrend: false, shift: 0, unit: "pkg:0", zoom: "well" },
+    2: { well: "CAL-GT-04", mode: "log", x: "instantaneous_frequency", y: "GR", color: "class", cut: 75, win: 0, detrend: true, shift: 0, unit: "pkg:0", zoom: "well" },
+    3: { well: "ASTEN-GT-02", mode: "log", x: "spectral_ratio", y: "GR", color: "class", cut: 65, win: 0, detrend: false, shift: 0, unit: "pkg:0", zoom: "someren" },
+    4: { well: "ASTEN-GT-02", mode: "log", x: "rms_amplitude", y: "PHID", color: "twt", win: 0, detrend: false, shift: 0, unit: "all", zoom: "someren" },
+    5: { well: "ASTEN-GT-02", mode: "log", x: "rms_amplitude", y: "PHID", color: "twt", win: 0, detrend: true, shift: 0, unit: "all", zoom: "someren" },
+    6: { well: "ASTEN-GT-02", mode: "log", x: "spectral_ratio", y: "GR", color: "class", cut: 65, win: 0, detrend: false, shift: 8, unit: "pkg:0", zoom: "someren" },
+    7: { well: "ASTEN-GT-02", mode: "attr", x: "spectral_ratio", y2: "far_minus_near", colorLog: "class", cut: 65, win: 0, shift: 0, unit: "pkg:0", zoom: "study" },
+    8: { well: "ASTEN-GT-02", mode: "log", x: "spectral_ratio", y: "GR", color: "class", cut: 65, win: 0, detrend: false, shift: 0, unit: "pkg:0", zoom: "study", som: true },
+    9: { well: "ASTEN-GT-02", mode: "log", x: "rms_amplitude", y: "GR", color: "unit", win: 0, detrend: false, shift: 0, unit: "Houthem Formation", zoom: "someren" },
   };
+
+  /* the attributes that separate the gamma ray classes most at the current well and interval, skipping any that
+     correlate at 0.9 or more along the well with one already chosen */
+  function chooseForSom(nPick = 4) {
+    const w = qw(), q = state.qi, o = { ...q, mode: "log", y: "GR", color: "class", detrend: false }, rows = [];
+    for (const k of ATTR_ORDER()) {
+      const pts = qiSamples(k, o), a = pts.filter((p) => p.cls === 0).map((p) => p.x), b = pts.filter((p) => p.cls === 1).map((p) => p.x);
+      if (a.length < 5 || b.length < 5) continue;
+      const m = (v) => v.reduce((x, y) => x + y, 0) / v.length, va = (v, mm) => v.reduce((x, y) => x + (y - mm) ** 2, 0) / (v.length - 1);
+      const sd = Math.sqrt((va(a, m(a)) + va(b, m(b))) / 2); if (sd) rows.push([k, Math.abs((m(b) - m(a)) / sd), pts]);
+    }
+    rows.sort((x, y) => y[1] - x[1]);
+    const chosen = [];
+    for (const [k, , pts] of rows) {
+      if (chosen.length >= nPick) break;
+      const xs = pts.map((p) => p.k);
+      const dup = chosen.some((c) => { const pa = xs.map((i) => ({ x: w.grid.attrs[k][i], y: w.grid.attrs[c][i] })).filter((p) => p.x != null && p.y != null); return Math.abs(corr(pa) ?? 0) >= 0.9; });
+      if (!dup) chosen.push(k);
+    }
+    return chosen;
+  }
 
   function wireQi() {
     const xSel = $("#qiX"), y2Sel = $("#qiY2"), groups = {};
@@ -1256,14 +1354,29 @@
     $("#qiUnit").addEventListener("change", (e) => { state.qi.unit = e.target.value; drawQi(); });
     $("#qiWin").addEventListener("input", (e) => { state.qi.win = +e.target.value; drawQi(); });
     $("#qiDetrend").addEventListener("change", (e) => { state.qi.detrend = e.target.checked; drawQi(); });
+    $("#qiCut").addEventListener("input", (e) => { state.qi.cuts[state.qi.well] = +e.target.value; drawQi(); });
+    $("#qiShift").addEventListener("input", (e) => { state.qi.shift = +e.target.value; drawQi(); });
+    $("#qiCorr").addEventListener("click", (e) => {   // a bar puts its attribute on the horizontal axis
+      const c = e.currentTarget, r = c.getBoundingClientRect(), y = (e.clientY - r.top) * c.height / r.height, top = 20, rowH = (c.height - top - 18) / corrRows.length;
+      const i = Math.floor((y - top) / rowH); if (i < 0 || i >= corrRows.length) return;
+      state.qi.x = corrRows[i][0]; state.qi.poly = []; state.qi.closed = false; qiChanged();
+    });
     $$("[name=qiMode]").forEach((b) => b.addEventListener("change", (e) => { state.qi.mode = e.target.value; qiChanged(); }));
     $$("#qiWell button").forEach((b) => b.addEventListener("click", () => {
       state.qi.well = b.dataset.well; state.qi.hover = null; setZoom(WELL_STYLE[b.dataset.well].zoom); qiChanged();
     }));
     $$("#qiSteps [data-qi]").forEach((b) => b.addEventListener("click", () => {
       const p = QI_STEPS[b.dataset.qi];
-      Object.assign(state.qi, { poly: [], closed: false, hover: null }, p);
-      setZoom(p.zoom || WELL_STYLE[p.well].zoom);
+      const { cut, zoom, som, ...rest } = p;
+      Object.assign(state.qi, { poly: [], closed: false, hover: null }, rest);
+      if (cut != null) state.qi.cuts[p.well] = cut;
+      if (som) {   // the log-selected attributes go to the SOM list, and the page moves to Build a SOM
+        const chosen = chooseForSom();
+        state.picked = new Set(chosen); syncPicks();
+        $("#qiToSomInfo").textContent = `Chosen at ${p.well} from the gamma ray classes: ${chosen.map((k) => meta.attributes[k].label).join(", ")}.`;
+        setZoom(zoom); setStage(4); return;
+      }
+      setZoom(zoom || WELL_STYLE[p.well].zoom);
       $$("#qiSteps [data-qi]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
       qiChanged();
     }));
