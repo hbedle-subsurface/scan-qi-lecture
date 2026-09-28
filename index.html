@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The SCAN029 case: well logs, attributes, SOM facies and SHAP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script data-goatcounter="https://hbedle.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+<body>
+<header class="bar">
+  <div class="case">
+    <h1>The SCAN029 case</h1>
+    <p>From the Californië geothermal wells to the Someren prospect, southeastern Netherlands</p>
+  </div>
+  <div class="job" aria-label="Exploration context">
+    <p><strong>Someren license:</strong> candidate aquifers are the intervals tested in ASTEN-GT-02 (1987): the sands of the 1987 Breda Formation (Oosterhout to Veldhoven formations in the 2021 TNO revision), the Voort Member, the Reusel Member (the 1987 Basal Dongen Sand) and the Houthem Formation, with potential for deeper geothermal below the Cenozoic section.</p>
+    <p><strong>Californië wells:</strong> warm water is produced from the karstified Dinantian carbonate of the Zeeland Formation.</p>
+  </div>
+  <nav class="stages" aria-label="Stages">
+    <a class="tag methods" href="methods.html" target="_blank" rel="noopener">Methods</a>
+    <button class="tag" data-stage="1" aria-current="true"><span>1</span>Line and wells</button>
+    <button class="tag" data-stage="2"><span>2</span>Geologic setting</button>
+    <button class="tag" data-stage="3"><span>3</span>Attributes</button>
+    <button class="tag" data-stage="8"><span>4</span>Logs and crossplots</button>
+    <button class="tag" data-stage="4"><span>5</span>Build a SOM</button>
+    <button class="tag" data-stage="5"><span>6</span>SHAP</button>
+    <button class="tag" data-stage="6"><span>7</span>Refine and compare</button>
+    <button class="tag" data-stage="7"><span>8</span>Someren prospect</button>
+  </nav>
+</header>
+
+<main class="board">
+  <section class="exhibit" aria-label="Seismic section">
+    <div class="viewbar">
+      <div class="seg" role="group" aria-label="Zoom">
+        <button data-zoom="study" aria-pressed="true">Study window</button>
+        <button data-zoom="full" aria-pressed="false">Whole line</button>
+        <button data-zoom="someren" aria-pressed="false">Someren area</button>
+        <button data-zoom="well" aria-pressed="false">Californië wells</button>
+        <button data-zoom="custom" aria-pressed="false" disabled title="Drag a box on the section to zoom">Zoom box</button>
+      </div>
+      <label class="seis">Seismic <select id="seisMap"></select> <button class="term" data-term="polarity">polarity</button></label>
+      <div class="chips" id="wellChips" role="group" aria-label="Wells shown"></div>
+      <div class="readout" id="readout">Drag a box on the section to zoom. Move over it to read values.</div>
+    </div>
+    <div class="canvaswrap"><canvas id="section" aria-label="Seismic section display"></canvas></div>
+    <div class="qi" id="qiPanel" hidden>
+      <div class="qi-well"><canvas id="wellPanel" aria-label="Well logs in two-way time"></canvas></div>
+      <div class="qi-xplot">
+        <canvas id="xplot" aria-label="Crossplot of well samples"></canvas>
+        <div class="qi-legend" id="qiLegend"></div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="notes">
+    <!-- Stage 1 -->
+    <div class="card" data-for="1">
+      <h2>Line and wells</h2>
+      <fieldset>
+        <label><input type="checkbox" id="showWell" checked> Wells</label>
+        <label><input type="checkbox" id="showHorizons"> Formation picks</label>
+        <label><input type="checkbox" id="showUnits"> Formation group shading</label>
+      </fieldset>
+      <p class="small">An asterisk (*) marks a formation named as a candidate geothermal reservoir: the intervals tested in ASTEN-GT-02 at Someren, and the Zeeland Formation at Californië.</p>
+      <button class="big" id="hideWellControl" aria-pressed="false">Hide all well control</button>
+      <div class="pick" id="pickPanel" hidden>
+        <h3>Pick horizons</h3>
+        <label class="field">Horizon <select id="pickHorizon"></select></label>
+        <label><input type="checkbox" id="pickSnap" checked> Snap to the horizon polarity within ±8 ms</label>
+        <p class="small">Click adds a point. Shift-click removes the nearest point. Picked horizons replace the automatic ones along their picked extent.</p>
+        <div class="row2"><button class="big" id="pickClear">Clear horizon</button><button class="big" id="pickSave">Download picks</button></div>
+      </div>
+    </div>
+
+    <!-- Geologic setting -->
+    <div class="card" data-for="2" hidden>
+      <h2>Geologic setting</h2>
+      <p class="small">Each event outlines where it can be seen on SCAN029.</p>
+      <div class="events">
+        <button data-geo="33.3,35.3,0.85,1.10" aria-pressed="false"><b>Carboniferous → Permian</b><small>Variscan uplift and erosion; Zechstein rests on Namurian shale at Californië (Base Permian unconformity)</small></button>
+        <button data-geo="33.8,35.3,0.70,0.82" aria-pressed="false"><b>Late Cretaceous</b><small>Inversion of the Roer Valley Graben; at Californië, Maastricht chalk rests on the Lower Buntsandstein</small></button>
+        <button data-geo="10.5,14.5,1.30,1.55" aria-pressed="false"><b>Paleocene–Eocene → Oligocene</b><small>Erosion at the base of the Oligocene; in ASTEN-GT-02 the Oligocene Berg Member rests on the Paleocene Reusel Member, and the whole Eocene is missing</small></button>
+        <button data-geo="12.0,22.0,0.30,1.60" aria-pressed="false"><b>Late Oligocene → present</b><small>Graben subsidence along the Peel Boundary Fault, with up to 1000 m of throw and up to 2000 m of Cenozoic fill</small></button>
+        <button data-geo="33.3,35.3,1.10,1.60" aria-pressed="false"><b>Dinantian</b><small>Carbonate platform; karst and fracture permeability produce warm water at Californië</small></button>
+      </div>
+      <label><input type="checkbox" id="geoColumns" checked> Formation groups at the wells</label>
+      <p class="small">An asterisk (*) on a formation name marks a candidate geothermal reservoir.</p>
+      <div id="groupLegend" class="legend-groups"></div>
+      <figure class="ref">
+        <a href="img/doornenbal2019_fig4.png" target="_blank" rel="noopener"><img src="img/doornenbal2019_fig4.png" alt="Interpreted west–east seismic line L2CAL2009A-2 across the Californië geothermal wells and the Tegelen Fault"></a>
+        <figcaption>Interpreted line L2CAL2009A-2 across the Californië wells and the Tegelen Fault, a different line from SCAN029. Doornenbal et al. (2019), Geological Society, London, Special Publications 494, fig. 4. CC BY 4.0.</figcaption>
+      </figure>
+    </div>
+
+    <!-- Attributes -->
+    <div class="card" data-for="3" hidden>
+      <h2>Attributes</h2>
+      <label class="field">Attribute
+        <select id="attrSelect"></select>
+      </label>
+      <label class="field">Color scale <select id="attrLut"></select></label>
+      <label class="field">Overlay opacity <input type="range" id="attrOpacity" min="0" max="1" step="0.05" value="0.75"></label>
+      <canvas id="colorbar" width="260" height="44" aria-label="Color scale"></canvas>
+      <label class="keep"><input type="checkbox" id="attrForSom"> Use this attribute in the SOM <span id="pickCount" class="count"></span></label>
+      <p class="small">Chosen for the SOM: <span id="somPicks2">none yet</span></p>
+      <dl class="explain">
+        <dt>Measures</dt><dd id="attrMeasures"></dd>
+        <dt>Often associated with</dt><dd id="attrGeology"></dd>
+        <dt>Source</dt><dd id="attrSource" class="small"></dd>
+      </dl>
+      <label><input type="checkbox" class="syncHorizons"> Formation picks</label>
+    </div>
+
+    <!-- Logs and crossplots (internal stage 8, shown fourth) -->
+    <div class="card" data-for="8" hidden>
+      <h2>Logs and crossplots</h2>
+      <div class="events" id="qiSteps">
+        <button data-qi="1" aria-pressed="false"><b>1. Porosity and one attribute</b><small>Density porosity at ASTEN-GT-02 against RMS amplitude, over the whole logged interval</small></button>
+        <button data-qi="2" aria-pressed="false"><b>2. The same samples, colored by time</b><small>Point color set by two-way time</small></button>
+        <button data-qi="3" aria-pressed="false"><b>3. The trend with time removed</b><small>A straight line in time subtracted from the log and from each attribute</small></button>
+        <button data-qi="4" aria-pressed="false"><b>4. A longer averaging window</b><small>Logs averaged over 62 ms, close to the attribute window</small></button>
+        <button data-qi="5" aria-pressed="false"><b>5. Gamma ray and lithology</b><small>Gamma ray against every attribute, trend removed</small></button>
+        <button data-qi="6" aria-pressed="false"><b>6. Two attributes, colored by gamma ray</b><small>A polygon drawn on the crossplot marks the same attribute combination along the whole line</small></button>
+        <button data-qi="7" aria-pressed="false"><b>7. The Houthem Formation</b><small>Samples from the Houthem Formation only, at ASTEN-GT-02 and CAL-GT-04</small></button>
+      </div>
+      <div class="seg qi-seg" role="group" aria-label="Well" id="qiWell">
+        <button data-well="ASTEN-GT-02" aria-pressed="true">ASTEN-GT-02</button><button data-well="CAL-GT-04" aria-pressed="false">CAL-GT-04</button>
+      </div>
+      <fieldset class="modes">
+        <label><input type="radio" name="qiMode" value="log" checked> Attribute against a log</label>
+        <label><input type="radio" name="qiMode" value="attr"> Two attributes, colored by a log</label>
+      </fieldset>
+      <label class="field">Horizontal axis: attribute <select id="qiX"></select></label>
+      <label class="field" data-mode="log">Vertical axis: log <select id="qiY"></select></label>
+      <label class="field" data-mode="attr" hidden>Vertical axis: attribute <select id="qiY2"></select></label>
+      <label class="field" data-mode="log">Point color <select id="qiColor"></select></label>
+      <label class="field" data-mode="attr" hidden>Point color: log <select id="qiColorLog"></select></label>
+      <label class="field">Samples from <select id="qiUnit"></select></label>
+      <label class="field">Log averaging window: <span id="qiWinText"></span> <button class="term" data-term="blocking">averaging</button>
+        <input type="range" id="qiWin" min="0" max="5" step="1" value="0"></label>
+      <label data-mode="log"><input type="checkbox" id="qiDetrend"> Remove the trend with time <button class="term" data-term="detrend">trend</button></label>
+      <div data-mode="attr" hidden>
+        <p class="small">Click on the crossplot to add polygon corners; click the first corner again to close it.</p>
+        <div class="row2"><button class="big" id="qiPolyClear">Clear polygon</button><button class="big" id="qiPolyUndo">Remove last corner</button></div>
+        <p class="small" id="qiPolyInfo"></p>
+      </div>
+      <label class="field">Overlay opacity <input type="range" id="qiOpacity" min="0" max="1" step="0.05" value="0.75"></label>
+      <h3 id="qiCorrTitle">Correlation with the log</h3><button class="term help" data-term="helpQiCorr">Help me read this plot</button>
+      <canvas id="qiCorr" width="268" height="360" aria-label="Correlation coefficient of every attribute with the chosen log"></canvas>
+      <p class="small">Correlation coefficient <button class="term" data-term="correlation">r</button> for the samples on the crossplot. Axis fixed at −1 to 1. Clicking a bar puts that attribute on the horizontal axis.</p>
+      <button class="big" id="qiToSom">Use the crossplot attributes in the SOM</button>
+      <p class="small" id="qiToSomInfo"></p>
+      <p class="small"><button class="term help" data-term="helpWellPanel">Reading the well panel</button><button class="term help" data-term="helpXplot">Reading the crossplot</button></p>
+    </div>
+
+    <!-- Build a SOM -->
+    <div class="card" data-for="4" hidden>
+      <h2>Build a SOM</h2>
+      <details open><summary>Attributes</summary>
+        <div id="attrChecks" class="checks attr-picks"></div>
+      </details>
+      <p class="small">Chosen: <span id="somPicks">none yet</span></p>
+      <label class="field">Neurons
+        <select id="neurons" class="neurons">
+          <option value="2">4 (2 × 2)</option><option value="3">9 (3 × 3)</option><option value="4">16 (4 × 4)</option>
+          <option value="5">25 (5 × 5)</option><option value="6" selected>36 (6 × 6)</option><option value="8">64 (8 × 8)</option><option value="10">100 (10 × 10)</option>
+        </select>
+      </label>
+      <label class="field">Area along the line
+        <select id="somArea"><option value="study" selected>Study window (0–40 km)</option><option value="full">Whole line</option><option value="someren">Someren area (0–21 km)</option><option value="well">Californië wells (29–40 km)</option><option value="view">Current view (zoom box)</option></select>
+      </label>
+      <div class="row2">
+        <label class="field">Top (s) <input type="number" id="somTop" min="0.15" max="2.9" step="0.05" value="0.15"></label>
+        <label class="field">Base (s) <input type="number" id="somBase" min="0.25" max="3.0" step="0.05" value="2.00"></label>
+      </div>
+      <p class="small">Attributes are converted to standard deviations within this window, and only samples inside it are trained on and classified.</p>
+      <button class="big run" id="runSom">Train the SOM</button>
+      <div class="progress" id="progress" hidden><div class="bar"><span id="progressBar"></span></div><p class="small"></p></div>
+      <label class="field">Overlay opacity <input type="range" id="somOpacity" min="0" max="1" step="0.05" value="0.75"></label>
+      <h3>The trained map</h3><button class="term help" data-term="helpSomGrid">Help me read this plot</button>
+      <canvas id="somGrid" width="268" height="268" aria-label="SOM neuron grid with 2D colors; click a neuron to switch it on or off"></canvas>
+      <div class="row2"><button class="big" id="neuronsAll">Show all neurons</button><button class="big" id="neuronsNone">Hide all neurons</button></div>
+      <p class="small" id="neuronInfo"></p>
+      <p class="small">Click a neuron to switch it on or off on the section; shift-click shows only that neuron. Dot size is the share of samples assigned to each neuron.</p>
+      <details><summary>Attributes that repeat each other</summary>
+        <div id="redundancy" class="small"></div>
+      </details>
+      <details><summary>Runs</summary>
+        <div id="runLog" class="runlog"><p class="small">No runs yet.</p></div>
+      </details>
+    </div>
+
+    <!-- SHAP -->
+    <div class="card" data-for="5" hidden>
+      <h2>SHAP</h2>
+      <p class="small" id="shapRunLabel">Train a SOM in stage 5 first.</p>
+      <h3>Global SHAP: how far each attribute moves samples across the map</h3><button class="term help" data-term="helpShapGlobal">Help me read this plot</button>
+      <canvas id="shapGlobal" width="268" height="200" aria-label="Mean SHAP magnitude by attribute"></canvas>
+      <p class="small">Mean <button class="term" data-term="shap">SHAP</button> magnitude over 400 random samples, as a fraction of the map width. Axis fixed at 0–0.3.</p>
+      <h3>Local SHAP: one sample</h3>
+      <p class="small" id="sampleTitle">Click the section to explain a sample</p>
+      <button class="term help" data-term="helpShapPath">Help me read this plot</button>
+      <canvas id="shapPath" width="268" height="268" aria-label="Path of a sample across the SOM grid"></canvas>
+      <button class="term help" data-term="helpShapBars">Help me read this plot</button>
+      <canvas id="shapLocal" width="268" height="200" aria-label="SHAP values for the clicked sample"></canvas>
+      <p class="small">The path starts at the average position of all samples and adds each attribute's SHAP value in turn, largest first, ending at the sample's position on the map.</p>
+    </div>
+
+    <!-- Refine and compare -->
+    <div class="card" data-for="6" hidden>
+      <h2>Refine and compare</h2>
+      <div id="comparePanel">
+        <fieldset class="modes">
+          <label><input type="radio" name="compareMode" value="off" checked> One run only</label>
+          <label><input type="radio" name="compareMode" value="wipe"> Two runs, one view with a movable split</label>
+          <label><input type="radio" name="compareMode" value="stacked"> Two runs, one view above the other</label>
+        </fieldset>
+        <label class="field" id="wipeRow">Split position <input type="range" id="wipe" min="0.05" max="0.95" step="0.01" value="0.5"></label>
+        <div class="row2"><label class="field">Left <select id="runA"></select></label><label class="field">Right <select id="runB"></select></label></div>
+        <button class="big" id="swapRuns">Swap left and right</button>
+        <label class="field">Overlay opacity <input type="range" id="somOpacity2" min="0" max="1" step="0.05" value="0.75"></label>
+        <div class="row2"><canvas id="somGridA" width="132" height="132" aria-label="Left run neuron grid"></canvas><canvas id="somGridB" width="132" height="132" aria-label="Right run neuron grid"></canvas></div>
+      </div>
+      <details open><summary>Change the attributes and run again</summary>
+        <p class="small">Change the set after reading the SHAP values, then train a second SOM in the same window.</p>
+        <div id="attrChecks2" class="checks attr-picks"></div>
+        <p class="small">Chosen: <span id="somPicks2b">none yet</span> <span id="pickCount2" class="count"></span></p>
+        <label class="field">Neurons
+          <select class="neurons">
+            <option value="2">4 (2 × 2)</option><option value="3">9 (3 × 3)</option><option value="4">16 (4 × 4)</option>
+            <option value="5">25 (5 × 5)</option><option value="6" selected>36 (6 × 6)</option><option value="8">64 (8 × 8)</option><option value="10">100 (10 × 10)</option>
+          </select>
+        </label>
+        <p class="small">Window: <span id="windowText"></span> (set in stage 5)</p>
+        <button class="big run" id="runSom2">Train the SOM again</button>
+        <div class="progress" hidden><div class="bar"><span></span></div><p class="small"></p></div>
+      </details>
+    </div>
+
+    <!-- Someren prospect -->
+    <div class="card" data-for="7" hidden>
+      <h2>Someren prospect</h2>
+      <p class="small">ASTEN-GT-02, drilled in 1987, lies 0.1 km from the line inside the license. Its tops, from the 2021 TNO revision, are placed in two-way time with the migration velocities.</p>
+      <label class="field">Overlay opacity <input type="range" id="verdictOpacity" min="0" max="1" step="0.05" value="0.6"></label>
+      <canvas id="somGridVerdict" width="268" height="268" aria-label="SOM neuron grid; click a neuron to switch it on or off"></canvas>
+      <div class="row2"><button class="big" id="neuronsAllV">Show all neurons</button><button class="big" id="neuronsNoneV">Hide all neurons</button></div>
+      <p class="small" id="neuronInfoVerdict"></p>
+    </div>
+  </aside>
+</main>
+
+<div class="glossary" id="glossary" role="dialog" aria-modal="false" hidden>
+  <button class="close" aria-label="Close">×</button>
+  <h3 id="glossTitle"></h3><p id="glossText"></p>
+</div>
+
+<footer class="foot">
+  <a href="methods.html" target="_blank" rel="noopener">Methods: data, attributes, SOM and SHAP</a> ·
+  Seismic: SCAN line L2EBN2020ASCAN029, EBN and TNO, via NLOG. Wells and logs: ASTEN-GT-02 and CAL-GT-04, NLOG.
+  Content CC BY-SA 4.0, Heather Bedle, University of Oklahoma.
+</footer>
+<script src="js/app.js"></script>
+</body>
+</html>
