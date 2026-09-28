@@ -32,6 +32,7 @@
   const state = {
     stage: 1, zoom: "study", showWell: true, showHorizons: false, showUnits: false, seisMap: "gray_black", attrLut: "default", showInterp: true, hideControl: false,
     attr: "coherence", attrOpacity: 0.75, somOpacity: 0.75, verdictOpacity: 0.55, sample: null, explained: null, traceKm: 34.19,
+    wiggles: true, wiggleGain: 1, wigglePx: 12,
     qi: { well: "ASTEN-GT-02", mode: "log", x: "rms_amplitude", y: "PHID", y2: "far_minus_near", color: "unit", colorLog: "GR", win: 0, detrend: false, unit: "all", poly: [], closed: false, hover: null, version: 0 },
     runs: [], current: -1, busy: false, picked: new Set(), neurons: 6, somArea: "study", somT: [0.15, 2.0], zoomT: null, drag: null, compare: false, compareMode: "off", runA: 0, runB: 1, wipe: 0.5, compareCache: {}, showGeoColumns: true, geoFocus: null, showSomeren: true, showNames: true, showKarst: true, showFault: true, hiddenWells: new Set(),
   };
@@ -51,7 +52,17 @@
   const hexToRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
   const fmt = (x) => (Math.abs(x) >= 100 ? x.toFixed(0) : Math.abs(x) >= 1 ? x.toFixed(1) : x.toFixed(2));
   const shortName = (f) => ({ instantaneous_phase: "Inst. phase", cos_instantaneous_phase: "Cos phase", quadrature_trace: "Quadrature", full_stack_amplitude: "Full amp.", near_stack_amplitude: "Near amp.", mid_stack_amplitude: "Mid amp.", far_stack_amplitude: "Far amp.", relative_acoustic_impedance: "Rel. AI", amplitude_volume_transform: "AVT", envelope: "Envelope", sweetness: "Sweetness", rms_amplitude: "RMS amp.", instantaneous_frequency: "Inst. freq.", spectral_ratio: "Spec. ratio",
-    apparent_dip: "Dip", dip_variability: "Dip var.", coherence: "Coherence", far_minus_near: "Far − near" }[f] || f);
+    apparent_dip: "Dip", dip_variability: "Dip var.", coherence: "Coherence", far_minus_near: "Far − near",
+    dq: "DQ", theta_px: "ThetaPX", dq_layer_average: "Average DQ", dq_layer_sum: "Sum DQ", signed_isochron: "Signed iso.", signed_half_isochron: "Half iso." }[f] || f);
+  // last attribute sample with a value: the DQ attributes stop at 2.0 s, the others run to the end of the grid
+  const lastJ = (k) => { const a = meta.attributes[k], g = meta.grid; return a && a.t_max != null ? Math.min(g.nt - 1, Math.round((a.t_max - meta.t_min) / g.dt)) : g.nt - 1; };
+  const isDq = (k) => !!(meta.attributes[k] && meta.attributes[k].dq);
+  function attrRaster(k, lut) {   // an attribute as an image, transparent where it has no values
+    const g = meta.grid, nt = g.nt, jm = lastJ(k), d = cache[`attr_${k}.bin`];
+    const c = raster(g.nx, nt, (i, j) => lut[d[i * nt + j]]);
+    if (jm < nt - 1) { const ctx = c.getContext("2d"), id = ctx.getImageData(0, 0, g.nx, nt); for (let j = jm + 1; j < nt; j++) for (let i = 0; i < g.nx; i++) id.data[(j * g.nx + i) * 4 + 3] = 0; ctx.putImageData(id, 0, 0); }
+    return c;
+  }
 
   /* ---------- rasters ---------- */
   function raster(nx, nt, colorAt) {
@@ -77,8 +88,8 @@
   async function buildOverlay() {
     const s = state.stage, g = meta.grid, nt = g.nt, tg = [meta.t_min - g.dt / 2, meta.t_min + (nt - 0.5) * g.dt];
     if (s === 3) {
-      const d = await loadBin(`attr_${state.attr}.bin`, Uint8Array), lut = state.attrLut === "default" ? meta.attributes[state.attr].lut : meta.luts[state.attrLut].lut;
-      return { img: raster(g.nx, nt, (i, j) => lut[d[i * nt + j]]), km: [g.km_min, g.km_max], t: tg };
+      await loadBin(`attr_${state.attr}.bin`, Uint8Array); const lut = state.attrLut === "default" ? meta.attributes[state.attr].lut : meta.luts[state.attrLut].lut;
+      return { img: attrRaster(state.attr, lut), km: [g.km_min, g.km_max], t: tg };
     }
     if (s === 8) return qiOverlay();
     if (isSom(s) && run()) return classOverlay(run());
@@ -228,6 +239,7 @@
     if (s === 1 && PICK_MODE) drawPicks();
     if (s === 5 && state.sample) drawSampleMarker();
     if (s === 2) drawGeologyOverlay();
+    if (wigglesOn()) drawWiggles();
     if (s === 8) drawQiMarker();
     if (isSom(s) && run() && !comparing) { const w = run().window; cx.save(); clipPlot(); cx.setLineDash([10, 5]); cx.strokeStyle = "#ffffff"; cx.lineWidth = 1.5;
       cx.strokeRect(X(w.km[0]), Y(w.t[0]), X(w.km[1]) - X(w.km[0]), Y(w.t[1]) - Y(w.t[0])); cx.restore(); }
@@ -494,6 +506,9 @@
   async function refresh() {
     const r = run(), key = state.stage <= 2 ? "" : state.stage === 3 ? `a:${state.attr}:${state.attrLut}` : state.stage === 8 ? qiOverlayKey() : `s:${r ? r.id + ":" + [...(r.hidden || [])].sort((a, b) => a - b).join(".") : "none"}`;
     if (key !== overlayKey) { overlay = key && !key.endsWith("none") ? await buildOverlay() : null; overlayKey = key; }
+    $$(".dqWiggle").forEach((el) => (el.hidden = !isDq(state.attr)));
+    $$(".dqWiggle8").forEach((el) => (el.hidden = !(state.qi.mode === "log" && isDq(state.qi.x))));
+    if (wigglesOn() && !dqWiggle) await loadWiggle();
     if (state.stage === 8) drawQi();
     drawSomGrid($("#somGrid")); drawSomGrid($("#somGridVerdict")); updateNeuronInfo();
     for (const [id, idx] of [["#somGridA", state.runA], ["#somGridB", state.runB]]) { const c = $(id); if (c && state.runs[idx]) drawGridFor(c, state.runs[idx]); } drawShapGlobal(); drawShapSample();
@@ -720,6 +735,8 @@
     const kmRange = { study: [ZOOMS.study[0], ZOOMS.study[1]], full: [meta.km_min, meta.km_max], someren: ZOOMS.someren, well: ZOOMS.well, view: [view().kmA, view().kmB] }[state.somArea];
     if (state.somArea === "view") { state.somT = [view().tA, view().tB]; $("#somTop").value = view().tA.toFixed(2); $("#somBase").value = view().tB.toFixed(2); }
     let [tTop, tBase] = state.somT; if (tBase <= tTop + 0.1) tBase = tTop + 0.1;
+    const tEnd = Math.min(...feats.map((f) => meta.t_min + lastJ(f) * g.dt));   // DQ attributes end at 2.0 s
+    if (tBase > tEnd) { tBase = tEnd; state.somT[1] = tEnd; $("#somBase").value = tEnd.toFixed(2); $("#windowText").textContent = windowText(); }
     const toI = (k) => Math.max(0, Math.min(g.nx - 1, Math.round((k - g.km_min) / (g.km_max - g.km_min) * (g.nx - 1))));
     const toJ = (t) => Math.max(0, Math.min(g.nt - 1, Math.round((t - meta.t_min) / g.dt)));
     const win = { i0: toI(kmRange[0]), i1: toI(kmRange[1]), j0: toJ(tTop), j1: toJ(tBase) };
@@ -795,9 +812,9 @@
       const g = meta.grid, gi = Math.round((km - g.km_min) / (g.km_max - g.km_min) * (g.nx - 1)), j = Math.min(g.nt - 1, Math.round((t - meta.t_min) / g.dt));
       let txt = `${km.toFixed(2)} km, ${t.toFixed(3)} s`;
       const attr = cache[`attr_${state.attr}.bin`], rr = run();
-      if (state.stage === 3 && attr && gi >= 0 && gi < g.nx) { const a = meta.attributes[state.attr]; txt += `, ${a.label} ${fmt(a.min + attr[gi * g.nt + j] / 255 * (a.max - a.min))} ${a.unit}`; }
+      if (state.stage === 3 && attr && gi >= 0 && gi < g.nx && j <= lastJ(state.attr)) { const a = meta.attributes[state.attr]; txt += `, ${a.label} ${fmt(a.min + attr[gi * g.nt + j] / 255 * (a.max - a.min))} ${a.unit}`; }
       const qa = cache[`attr_${state.qi.x}.bin`];
-      if (state.stage === 8 && state.qi.mode === "log" && qa && gi >= 0 && gi < g.nx) { const a = meta.attributes[state.qi.x]; txt += `, ${a.label} ${fmt(a.min + qa[gi * g.nt + j] / 255 * (a.max - a.min))} ${a.unit}`; }
+      if (state.stage === 8 && state.qi.mode === "log" && qa && gi >= 0 && gi < g.nx && j <= lastJ(state.qi.x)) { const a = meta.attributes[state.qi.x]; txt += `, ${a.label} ${fmt(a.min + qa[gi * g.nt + j] / 255 * (a.max - a.min))} ${a.unit}`; }
       if (isSom(state.stage) && rr && gi >= 0 && gi < g.nx && rr.bmu[gi * g.nt + j] !== 255) { const k = rr.bmu[gi * g.nt + j]; txt += `, neuron row ${Math.floor(k / rr.side) + 1}, column ${k % rr.side + 1}`; }
       $("#readout").textContent = txt;
     });
@@ -836,6 +853,40 @@
     });
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") gl.hidden = true; });
     new ResizeObserver(resize).observe($(".canvaswrap"));
+  }
+
+
+  /* ---------- unfilled DQ wiggle traces over a DQ attribute ---------- */
+  let dqWiggle = null;
+  const wigglesOn = () => state.wiggles && ((state.stage === 3 && isDq(state.attr)) || (state.stage === 8 && state.qi.mode === "log" && isDq(state.qi.x)));
+  async function loadWiggle() {
+    const w = meta.dq_wiggle, d = await loadBin(w.file, Uint8Array), v = new Float32Array(d.length), sc = (w.max - w.min) / 255;
+    for (let i = 0; i < d.length; i++) v[i] = w.min + d[i] * sc;
+    dqWiggle = v;
+  }
+  // Traces are spaced at least wigglePx pixels apart, and the deflection is scaled to the fixed DQ color range
+  // (a value of 280 moves the trace by the gain times one trace spacing), so it does not change with the view.
+  function drawWiggles() {
+    const v = dqWiggle, w = meta.dq_wiggle; if (!v) return;
+    const vw = view(), kmStep = (meta.grid.km_max - meta.grid.km_min) / (w.nx - 1), pxPerTrace = (W - MARGIN.l - MARGIN.r) / ((vw.kmB - vw.kmA) / kmStep);
+    const step = Math.max(1, Math.ceil(state.wigglePx / pxPerTrace)), spacing = step * pxPerTrace, amp = spacing * state.wiggleGain / w.max;
+    const gi = (km) => Math.round((km - meta.grid.km_min) / kmStep), gj = (t) => Math.max(0, Math.min(w.nt - 1, Math.round((t - w.t_min) / w.dt)));
+    const i0 = Math.max(0, gi(vw.kmA) - step), i1 = Math.min(w.nx - 1, gi(vw.kmB) + step), j0 = gj(Math.max(vw.tA, w.t_min)), j1 = gj(vw.tB);
+    const jStep = Math.max(1, Math.floor((j1 - j0) / (H - MARGIN.t - MARGIN.b)));
+    cx.save(); clipPlot(); cx.lineWidth = 0.9; cx.strokeStyle = "#000"; cx.lineJoin = "round";
+    for (let i = Math.floor(i0 / step) * step; i <= i1; i += step) {
+      const x0 = X(meta.grid.km_min + i * kmStep); cx.beginPath();
+      for (let j = j0; j <= j1; j += jStep) {   // deflection limited to one trace spacing, so values beyond the color range do not cross the neighboring traces
+        const x = x0 + Math.max(-spacing, Math.min(spacing, v[i * w.nt + j] * amp)), y = Y(w.t_min + j * w.dt); j === j0 ? cx.moveTo(x, y) : cx.lineTo(x, y); }
+      cx.stroke();
+    }
+    cx.restore();
+    $$(".wiggleSpacing").forEach((el) => (el.textContent = `One wiggle every ${step * 20} m at this zoom.`));
+  }
+  function wireWiggles() {
+    $$(".wiggleToggle").forEach((b) => b.addEventListener("change", (e) => { state.wiggles = e.target.checked; $$(".wiggleToggle").forEach((x) => (x.checked = state.wiggles)); refresh(); }));
+    $("#wiggleGain").addEventListener("input", (e) => { state.wiggleGain = +e.target.value; draw(); });
+    $("#wigglePx").addEventListener("input", (e) => { state.wigglePx = +e.target.value; draw(); });
   }
 
   /* ---------- logs and crossplots (internal stage 8, shown fourth) ---------- */
@@ -923,7 +974,7 @@
     if (qiDensity.c[id]) return qiDensity.c[id];
     const dx = await loadBin(`attr_${q.x}.bin`, Uint8Array), dy = await loadBin(`attr_${q.y2}.bin`, Uint8Array);
     const g = meta.grid, nt = g.nt, B = 64, h = new Float32Array(B * B);
-    const i1 = Math.round((ZOOMS.study[1] - g.km_min) / (g.km_max - g.km_min) * (g.nx - 1)), j1 = Math.round((STUDY_T[1] - meta.t_min) / g.dt);
+    const i1 = Math.round((ZOOMS.study[1] - g.km_min) / (g.km_max - g.km_min) * (g.nx - 1)), j1 = Math.min(Math.round((STUDY_T[1] - meta.t_min) / g.dt), lastJ(q.x), lastJ(q.y2));
     for (let i = 0; i <= i1; i++) for (let j = 0; j <= j1; j++) { const idx = i * nt + j; h[(dx[idx] >> 2) * B + (63 - (dy[idx] >> 2))]++; }
     const mx = Math.log1p(Math.max(...h)), c = makeCanvas(B, B), ctx = c.getContext("2d"), img = ctx.createImageData(B, B);
     for (let a = 0; a < B; a++) for (let b = 0; b < B; b++) {
@@ -940,8 +991,8 @@
     const dx = await loadBin(`attr_${q.x}.bin`, Uint8Array), dy = await loadBin(`attr_${q.y2}.bin`, Uint8Array);
     const g = meta.grid, nt = g.nt, c = makeCanvas(g.nx, nt), ctx = c.getContext("2d"), img = ctx.createImageData(g.nx, nt);
     const i1 = Math.round((ZOOMS.study[1] - g.km_min) / (g.km_max - g.km_min) * (g.nx - 1)), j1 = Math.round((STUDY_T[1] - meta.t_min) / g.dt);
-    let nIn = 0, nAll = 0;
-    for (let i = 0; i < g.nx; i++) for (let j = 0; j < nt; j++) {
+    let nIn = 0, nAll = 0; const jm = Math.min(lastJ(q.x), lastJ(q.y2));
+    for (let i = 0; i < g.nx; i++) for (let j = 0; j <= jm; j++) {
       const idx = i * nt + j, hit = lut[dx[idx] * 256 + dy[idx]];
       if (i <= i1 && j <= j1) { nAll++; nIn += hit; }
       if (hit) { const p = (j * g.nx + i) * 4; img.data[p] = 255; img.data[p + 1] = 209; img.data[p + 2] = 102; img.data[p + 3] = 255; }
@@ -959,8 +1010,8 @@
   async function qiOverlay() {
     const q = state.qi, g = meta.grid, nt = g.nt;
     if (q.mode === "log") {
-      const d = await loadBin(`attr_${q.x}.bin`, Uint8Array), lut = meta.attributes[q.x].lut;
-      return { img: raster(g.nx, nt, (i, j) => lut[d[i * nt + j]]), km: [g.km_min, g.km_max], t: [meta.t_min - g.dt / 2, meta.t_min + (nt - 0.5) * g.dt] };
+      await loadBin(`attr_${q.x}.bin`, Uint8Array);
+      return { img: attrRaster(q.x, meta.attributes[q.x].lut), km: [g.km_min, g.km_max], t: [meta.t_min - g.dt / 2, meta.t_min + (nt - 0.5) * g.dt] };
     }
     return qiMask();
   }
@@ -1314,7 +1365,7 @@
     try { logs = await (await fetch("data/logs.json")).json(); } catch (_) { logs = null; }
     autoHorizons = meta.horizons.items;
     baseImg = raster(meta.section.nx, meta.nt, grayAt);
-    wire(); wireWellChips(); wireGeology(); wireBuilder(); wireNeuronToggles(); wireCompare(); wireSomPicks(); setupPickMode(); if (logs) wireQi(); drawColorbar(); resize(); refresh();
+    wire(); wireWellChips(); wireGeology(); wireBuilder(); wireNeuronToggles(); wireCompare(); wireSomPicks(); setupPickMode(); wireWiggles(); if (logs) wireQi(); drawColorbar(); resize(); refresh();
   }
   init();
 })();

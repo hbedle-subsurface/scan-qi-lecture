@@ -112,7 +112,8 @@ def main():
         att = {}
         for k, A in meta["attributes"].items():
             q = attrs[k][i_j, j_in].astype(float)
-            att[k] = [round(float(A["min"] + v / 255 * (A["max"] - A["min"])), 4) for v in q]
+            ok = tg[j_in] <= A.get("t_max", 99) + 1e-6       # DQ attributes stop at 1.998 s
+            att[k] = [round(float(A["min"] + v / 255 * (A["max"] - A["min"])), 4) if o else None for v, o in zip(q, ok)]
 
         tops = sorted([t for t in w["tops"]], key=lambda t: t["md"])
         units = []

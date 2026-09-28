@@ -49,3 +49,6 @@ FIRST_CDP = 100
 # Replace with the intersection of the license polygon once the coordinates are available.
 SOMEREN_KM = (3.3, 16.4)
 SOMEREN_TARGET_DEPTH_M = (500, 1500)   # "middeldiepe geothermie" depth range stated by the developer
+
+# data/ folder of the scan-dq repository: the DQ attributes computed in AASPI (step6b_dq.py reads only these outputs)
+DQ_DATA = ROOT.parent / "scan-dq" / "data"

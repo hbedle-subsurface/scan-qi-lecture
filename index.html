@@ -106,6 +106,13 @@
       <label class="field">Color scale <select id="attrLut"></select></label>
       <label class="field">Overlay opacity <input type="range" id="attrOpacity" min="0" max="1" step="0.05" value="0.75"></label>
       <canvas id="colorbar" width="260" height="44" aria-label="Color scale"></canvas>
+      <div class="dqWiggle" hidden>
+        <label><input type="checkbox" class="wiggleToggle" checked> DQ wiggles, unfilled</label>
+        <label class="field">Wiggle amplitude <input type="range" id="wiggleGain" min="0.3" max="4" step="0.1" value="1"></label>
+        <label class="field">Wiggle spacing on screen <input type="range" id="wigglePx" min="4" max="30" step="1" value="12"></label>
+        <p class="small wiggleSpacing"></p>
+        <p class="small">DQ attributes are available from 0.15 to 2.0 s and are in SEG normal polarity, an impedance increase positive, the opposite of the seismic display.</p>
+      </div>
       <label class="keep"><input type="checkbox" id="attrForSom"> Use this attribute in the SOM <span id="pickCount" class="count"></span></label>
       <p class="small">Chosen for the SOM: <span id="somPicks2">none yet</span></p>
       <dl class="explain">
@@ -149,6 +156,7 @@
         <div class="row2"><button class="big" id="qiPolyClear">Clear polygon</button><button class="big" id="qiPolyUndo">Remove last corner</button></div>
         <p class="small" id="qiPolyInfo"></p>
       </div>
+      <label class="dqWiggle8" hidden><input type="checkbox" class="wiggleToggle" checked> DQ wiggles, unfilled</label>
       <label class="field">Overlay opacity <input type="range" id="qiOpacity" min="0" max="1" step="0.05" value="0.75"></label>
       <h3 id="qiCorrTitle">Correlation with the log</h3><button class="term help" data-term="helpQiCorr">Help me read this plot</button>
       <canvas id="qiCorr" width="268" height="360" aria-label="Correlation coefficient of every attribute with the chosen log"></canvas>
