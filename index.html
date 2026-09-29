@@ -35,6 +35,46 @@
 </header>
 
 <main class="board">
+  <aside class="exercise-col" aria-label="Exercise">
+    <!-- The exercise: shown on every stage -->
+    <details class="card exercise" open>
+      <summary><h2>Exercise</h2></summary>
+      <h3>Part 1. Exploring Someren from Californië</h3>
+      <div class="events" id="exSteps">
+        <button data-ex="1" aria-pressed="false"><b>1. CAL-GT-04 at Californië</b><small>The well tops on the section, and drilling time, temperature and gamma ray (below 815 m) in the well panel</small></button>
+        <button data-ex="2" aria-pressed="false"><b>2. Pick the Houthem toward Someren</b><small>Clicks on the section add points to a Houthem pick, from the well at Californië westward across the fault zone</small></button>
+        <button data-ex="3" aria-pressed="false"><b>3. What changes at the top of the chalk</b><small>Attributes at CAL-GT-04 for the Houthem and Maastricht formations against the Landen Clay to Swalmen members above, grouped by the well tops</small></button>
+        <button data-ex="4" aria-pressed="false"><b>4. An attribute along the Houthem pick</b><small>The attribute that separates the two groups most, on the section and along the pick from Californië to Someren</small></button>
+        <button data-ex="5" aria-pressed="false"><b>5. A SOM from the attributes chosen at Californië</b><small>The four attributes that separate the groups most, skipping near-duplicates, go to Build a SOM</small></button>
+        <button data-ex="6" aria-pressed="false"><b>6. Where the Californië Houthem classes occur</b><small>Only the SOM classes of the Houthem samples at CAL-GT-04 are shown along the line</small></button>
+        <button data-ex="7" aria-pressed="false"><b>7. SHAP</b><small>Which attributes place samples in those classes</small></button>
+        <button data-ex="8" aria-pressed="false"><b>8. Reveal the Someren well</b><small>The well inside the license, its Houthem top compared with the pick, and the SOM classes at the well</small></button>
+      </div>
+      <div id="pickCtl" hidden>
+        <p class="small">Picking is on: clicks on the section add points. Dragging a box still zooms. <span id="pickInfo"></span></p>
+        <label class="field">Snap each point to <button class="term" data-term="snap">snapping</button>
+          <select id="pickSnap"><option value="none">No snapping</option><option value="peak">Nearest peak (positive amplitude)</option><option value="trough">Nearest trough (negative amplitude)</option><option value="zero">Nearest zero crossing</option></select></label>
+        <div class="row2"><button class="big" id="pickUndo">Remove last point</button><button class="big" id="pickClearAll">Clear pick</button></div>
+        <button class="big" id="pickDone">Done picking</button>
+      </div>
+      <p class="small" id="exInfo"></p>
+      <div id="revealReport"></div>
+      <h3>Part 2. Well logs after the reveal</h3>
+      <p class="small beforeReveal">Available after the reveal.</p>
+      <div class="events afterReveal" id="qiSteps" hidden>
+        <button data-qi="1" aria-pressed="false"><b>1. Zeeland against Epen at CAL-GT-04</b><small>The producing carbonate and the shale above it, split by a gamma ray cutoff, and the attributes that measure interval character separating them</small></button>
+        <button data-qi="2" aria-pressed="false"><b>2. Lithology or depth?</b><small>The same samples with a straight-line trend with time removed from gamma ray and from each attribute</small></button>
+        <button data-qi="3" aria-pressed="false"><b>3. Gamma ray classes from the Someren to the Boom members</b><small>ASTEN-GT-02, where gamma ray changes little with time; the cutoff slider sets the classes</small></button>
+        <button data-qi="4" aria-pressed="false"><b>4. Porosity over the whole logged interval</b><small>Density porosity against RMS amplitude, colored by two-way time; the averaging window slider changes the scale of the logs</small></button>
+        <button data-qi="5" aria-pressed="false"><b>5. Porosity with the trend removed</b><small>The same samples after a straight-line trend with time is subtracted</small></button>
+        <button data-qi="6" aria-pressed="false"><b>6. The well tie</b><small>Logs and tops moved 8 ms down; the tie shift slider moves them up to 16 ms either way</small></button>
+        <button data-qi="7" aria-pressed="false"><b>7. Two attributes and a polygon</b><small>Spectral ratio against far minus near, colored by class; a polygon marks the same combination along the whole line</small></button>
+        <button data-qi="8" aria-pressed="false"><b>8. Attributes chosen at the well, into the SOM</b><small>The four attributes that separate the classes most, skipping near-duplicates, go to Build a SOM</small></button>
+        <button data-qi="9" aria-pressed="false"><b>9. The Houthem Formation</b><small>The target at both wells, where the logs run out</small></button>
+      </div>
+    </details>
+  </aside>
+
   <section class="exhibit" aria-label="Seismic section">
     <div class="viewbar">
       <div class="seg" role="group" aria-label="Zoom">
@@ -60,42 +100,6 @@
   </section>
 
   <aside class="notes">
-    <!-- The exercise: shown on every stage -->
-    <details class="card exercise" open>
-      <summary><h2>Exercise</h2></summary>
-      <h3>Part 1. Exploring Someren from Californië</h3>
-      <div class="events" id="exSteps">
-        <button data-ex="1" aria-pressed="false"><b>1. CAL-GT-04 at Californië</b><small>The well tops on the section, and drilling time, temperature and gamma ray (below 815 m) in the well panel</small></button>
-        <button data-ex="2" aria-pressed="false"><b>2. Pick the Houthem toward Someren</b><small>Clicks on the section add points to a Houthem pick, from the well at Californië westward across the fault zone</small></button>
-        <button data-ex="3" aria-pressed="false"><b>3. What changes at the top of the chalk</b><small>Attributes at CAL-GT-04 for the Houthem and Maastricht formations against the Landen Clay to Swalmen members above, grouped by the well tops</small></button>
-        <button data-ex="4" aria-pressed="false"><b>4. An attribute along the Houthem pick</b><small>The attribute that separates the two groups most, on the section and along the pick from Californië to Someren</small></button>
-        <button data-ex="5" aria-pressed="false"><b>5. A SOM from the attributes chosen at Californië</b><small>The four attributes that separate the groups most, skipping near-duplicates, go to Build a SOM</small></button>
-        <button data-ex="6" aria-pressed="false"><b>6. Where the Californië Houthem classes occur</b><small>Only the SOM classes of the Houthem samples at CAL-GT-04 are shown along the line</small></button>
-        <button data-ex="7" aria-pressed="false"><b>7. SHAP</b><small>Which attributes place samples in those classes</small></button>
-        <button data-ex="8" aria-pressed="false"><b>8. Reveal the Someren well</b><small>The well inside the license, its Houthem top compared with the pick, and the SOM classes at the well</small></button>
-      </div>
-      <div id="pickCtl" hidden>
-        <p class="small">Picking is on: clicks on the section add points. Dragging a box still zooms. <span id="pickInfo"></span></p>
-        <div class="row2"><button class="big" id="pickUndo">Remove last point</button><button class="big" id="pickClearAll">Clear pick</button></div>
-        <button class="big" id="pickDone">Done picking</button>
-      </div>
-      <p class="small" id="exInfo"></p>
-      <div id="revealReport"></div>
-      <h3>Part 2. Well logs after the reveal</h3>
-      <p class="small beforeReveal">Available after the reveal.</p>
-      <div class="events afterReveal" id="qiSteps" hidden>
-        <button data-qi="1" aria-pressed="false"><b>1. Zeeland against Epen at CAL-GT-04</b><small>The producing carbonate and the shale above it, split by a gamma ray cutoff, and the attributes that measure interval character separating them</small></button>
-        <button data-qi="2" aria-pressed="false"><b>2. Lithology or depth?</b><small>The same samples with a straight-line trend with time removed from gamma ray and from each attribute</small></button>
-        <button data-qi="3" aria-pressed="false"><b>3. Gamma ray classes from the Someren to the Boom members</b><small>ASTEN-GT-02, where gamma ray changes little with time; the cutoff slider sets the classes</small></button>
-        <button data-qi="4" aria-pressed="false"><b>4. Porosity over the whole logged interval</b><small>Density porosity against RMS amplitude, colored by two-way time; the averaging window slider changes the scale of the logs</small></button>
-        <button data-qi="5" aria-pressed="false"><b>5. Porosity with the trend removed</b><small>The same samples after a straight-line trend with time is subtracted</small></button>
-        <button data-qi="6" aria-pressed="false"><b>6. The well tie</b><small>Logs and tops moved 8 ms down; the tie shift slider moves them up to 16 ms either way</small></button>
-        <button data-qi="7" aria-pressed="false"><b>7. Two attributes and a polygon</b><small>Spectral ratio against far minus near, colored by class; a polygon marks the same combination along the whole line</small></button>
-        <button data-qi="8" aria-pressed="false"><b>8. Attributes chosen at the well, into the SOM</b><small>The four attributes that separate the classes most, skipping near-duplicates, go to Build a SOM</small></button>
-        <button data-qi="9" aria-pressed="false"><b>9. The Houthem Formation</b><small>The target at both wells, where the logs run out</small></button>
-      </div>
-    </details>
-
     <!-- Stage 1 -->
     <div class="card" data-for="1">
       <h2>Line and wells</h2>

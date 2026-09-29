@@ -19,6 +19,7 @@
     helpShapGlobal: ["Reading global SHAP", "Global SHAP describes the whole SOM: Each sample sits somewhere on the neuron grid. For each attribute, SHAP measures how far that attribute pushes a sample away from the average position on the grid. The bars average that distance over 400 random samples. A long bar means the SOM relies on that attribute to separate samples; a short bar means that attribute changes little about where samples land. The unit is a fraction of the grid width, so 0.10 on a 6 x 6 map is half a neuron, since the grid is five neuron spacings across. Attributes that repeat each other split the credit between them, so each can look less important than the information they share."],
     helpShapPath: ["Reading the path on the grid", "The hollow circle is where an average sample would land on the grid. Each arrow is one attribute's SHAP value for the clicked sample: the direction and distance that attribute moves the sample. The arrows are drawn largest first and added end to end, and the yellow dot is where the sample actually lands, the neuron that colors it on the section. Long arrows mark the attributes that decided this sample's color. Arrows pointing in opposite directions are attributes pulling the sample toward different parts of the map."],
     helpShapBars: ["Reading local SHAP", "Local SHAP describes one clicked sample. These bars give the length of each arrow in the path above: how far each attribute moves this one sample across the grid, as a fraction of the grid width. The global SHAP bars higher up average the same quantity over many samples, so an attribute can matter a great deal for one sample and little on average, or the reverse."],
+    snap: ["Snapping a pick", "Each clicked point can be moved to the nearest peak (positive amplitude), trough (negative amplitude) or zero crossing of the seismic within 16 ms above or below the click, found on the mean of the three 10 m traces around it. Peaks and troughs are placed between samples with a parabola through three samples, and zero crossings by linear interpolation. Whether a peak is drawn black or white depends on the seismic color scale in use (see polarity). Changing the snap setting moves every point again from where it was clicked. Between points the pick is a straight line in time."],
     blocking: ["Log averaging window", "The logs are sampled every 0.1 m, less than 0.1 ms of two-way time here, while the attributes are exported every 4 ms and most are averaged over 62 ms. Each log is averaged over a window centered on each 4 ms attribute sample before the two are compared. A longer window removes thin beds from the log, so the log changes over distances closer to those over which the attributes change."],
     detrend: ["Trend with time", "Porosity decreases with depth as sediments compact, and several attributes also change with travel time; instantaneous frequency, for example, decreases as higher frequencies are attenuated. Two quantities that both change steadily with time correlate even without any link between them at a given depth. With this option a straight line against two-way time is fitted to the log and to the attribute over the samples shown, and the crossplot shows what is left after each line is subtracted."],
     correlation: ["Correlation coefficient (r)", "Pearson correlation between two quantities over a set of samples, from −1 to 1. Its square is the fraction of the variance of one quantity that a straight line through the points accounts for. With few samples r changes a lot from one set of samples to the next, so it is not computed for fewer than five samples."],
@@ -1519,7 +1520,28 @@
 
   /* ---------- Part 1 of the exercise: exploring the Someren area from Californië, with ASTEN-GT-02 hidden until the reveal ---------- */
   const HIDDEN_WELL = "ASTEN-GT-02", HOUTHEM = "Houthem Formation";
-  state.explore = { revealed: false, pick: [], picking: false, houthemNeurons: null };
+  state.explore = { revealed: false, pick: [], picking: false, houthemNeurons: null, snap: "none" };
+
+  /* snapping a pick point to the nearest peak, trough or zero crossing of the seismic within ±16 ms, on the mean of
+     three 10 m traces around the click; peaks and troughs are refined with a parabola through three samples, zero
+     crossings by linear interpolation */
+  const SNAP_WIN = 8;   // samples of 2 ms either side
+  function snapTime(km, t) {
+    const mode = state.explore.snap; if (mode === "none" || !section) return t;
+    const nt = meta.nt, nx = meta.section.nx, dx = meta.section.dx_m / 1000;
+    const i = Math.max(1, Math.min(nx - 2, Math.round((km - meta.km_min) / dx))), j0 = Math.round((t - meta.t_min) / meta.dt);
+    const a = (j) => (j < 0 || j >= nt ? 0 : section[(i - 1) * nt + j] + section[i * nt + j] + section[(i + 1) * nt + j]);
+    let best = null;
+    for (let j = Math.max(1, j0 - SNAP_WIN); j <= Math.min(nt - 2, j0 + SNAP_WIN); j++) {
+      const am = a(j - 1), a0 = a(j), ap = a(j + 1); let tj = null;
+      if (mode === "peak" && a0 > 0 && a0 >= am && a0 > ap) tj = j + parab(am, a0, ap);
+      else if (mode === "trough" && a0 < 0 && a0 <= am && a0 < ap) tj = j + parab(am, a0, ap);
+      else if (mode === "zero" && a0 !== ap && Math.sign(a0) !== Math.sign(ap) && a0 !== 0) tj = j + a0 / (a0 - ap);
+      if (tj != null && (best == null || Math.abs(tj - j0) < Math.abs(best - j0))) best = tj;
+    }
+    return best == null ? t : meta.t_min + best * meta.dt;
+  }
+  function parab(am, a0, ap) { const d = am - 2 * a0 + ap; return d ? Math.max(-0.5, Math.min(0.5, 0.5 * (am - ap) / d)) : 0; }
   const wellMeta = (name) => (meta.wells || []).find((w) => w.name === name);
   const pathAt = (w, t) => {   // km of a well path at two-way time t
     const p = w.path.filter((q, i) => i === 0 || q.twt > w.path[i - 1].twt);
@@ -1551,7 +1573,7 @@
     return null;
   }
   function addPickPoint(km, t) {
-    const p = state.explore.pick; p.push([km, t]); p.sort((a, b) => a[0] - b[0]);
+    const p = state.explore.pick; p.push([km, snapTime(km, t), t]); p.sort((a, b) => a[0] - b[0]);
     updatePickInfo(); draw(); drawPickProfile();
   }
   function updatePickInfo() {
@@ -1669,6 +1691,11 @@
     $("#pickUndo").addEventListener("click", () => { state.explore.pick.pop(); updatePickInfo(); draw(); drawPickProfile(); });
     $("#pickClearAll").addEventListener("click", () => { state.explore.pick = []; updatePickInfo(); draw(); drawPickProfile(); });
     $("#pickDone").addEventListener("click", () => { state.explore.picking = false; $("#pickCtl").hidden = true; });
+    $("#pickSnap").addEventListener("change", (e) => {   // re-snap every point from where it was clicked
+      state.explore.snap = e.target.value;
+      state.explore.pick = state.explore.pick.map(([km, , tc]) => [km, snapTime(km, tc), tc]);
+      updatePickInfo(); draw(); drawPickProfile();
+    });
     new ResizeObserver(() => drawPickProfile()).observe($("#pickProfileWrap"));
     applyHidden(); updatePickInfo();
   }
