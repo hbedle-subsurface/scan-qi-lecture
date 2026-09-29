@@ -1369,10 +1369,9 @@
     4: { well: "ASTEN-GT-02", mode: "log", x: "rms_amplitude", y: "PHID", color: "twt", win: 0, detrend: false, shift: 0, unit: "all", zoom: "someren" },
     5: { well: "ASTEN-GT-02", mode: "log", x: "rms_amplitude", y: "PHID", color: "twt", win: 0, detrend: true, shift: 0, unit: "all", zoom: "someren" },
     6: { well: "ASTEN-GT-02", mode: "log", x: "spectral_ratio", y: "GR", color: "class", cut: 65, win: 0, detrend: false, shift: 8, unit: "pkg:0", zoom: "someren" },
-    7: { well: "ASTEN-GT-02", mode: "log", x: "dq", y: "PHID", color: "unit", win: 0, detrend: false, shift: 0, unit: "all", zoom: "someren" },
-    8: { well: "ASTEN-GT-02", mode: "attr", x: "spectral_ratio", y2: "far_minus_near", colorLog: "class", cut: 65, win: 0, shift: 0, unit: "pkg:0", zoom: "study" },
-    9: { well: "ASTEN-GT-02", mode: "log", x: "spectral_ratio", y: "GR", color: "class", cut: 65, win: 0, detrend: false, shift: 0, unit: "pkg:0", zoom: "study", som: true },
-    10: { well: "ASTEN-GT-02", mode: "log", x: "rms_amplitude", y: "GR", color: "unit", win: 0, detrend: false, shift: 0, unit: "Houthem Formation", zoom: "someren" },
+    7: { well: "ASTEN-GT-02", mode: "attr", x: "spectral_ratio", y2: "far_minus_near", colorLog: "class", cut: 65, win: 0, shift: 0, unit: "pkg:0", zoom: "study" },
+    8: { well: "ASTEN-GT-02", mode: "log", x: "spectral_ratio", y: "GR", color: "class", cut: 65, win: 0, detrend: false, shift: 0, unit: "pkg:0", zoom: "study", som: true },
+    9: { well: "ASTEN-GT-02", mode: "log", x: "rms_amplitude", y: "GR", color: "unit", win: 0, detrend: false, shift: 0, unit: "Houthem Formation", zoom: "someren" },
   };
 
   /* the attributes that separate the gamma ray classes most at the current well and interval, skipping any that
