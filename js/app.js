@@ -28,7 +28,7 @@
     separation: ["Separation in standard deviations", "For each attribute, the mean of the high gamma ray class minus the mean of the low gamma ray class, divided by the pooled standard deviation of the two classes (Cohen's d). A value near zero means the two classes take similar attribute values; a value of 2 or more means their distributions barely overlap. The sign gives which class has the higher values. It is not computed when either class has fewer than five samples."],
     helpQiSep: ["Reading the separation bars", "One bar per attribute: how far apart that attribute places the low and high gamma ray classes, in standard deviations, for the same well, interval, averaging window and trend setting as the crossplot. A bar to the right means the attribute is higher in the high gamma ray class; a bar to the left means it is lower. The red bar is the attribute on the horizontal axis. Moving the cutoff changes which samples are in each class, and so which attributes separate them."],
     tieShift: ["Tie shift", "Neither well has a sonic log or checkshot, so the logs and formation tops are placed in two-way time with velocities from the seismic processing, and the tie between log and seismic can be off by several milliseconds. The slider moves the logs and tops down (positive) or up (negative) against the seismic, and the well panel, crossplot and bars use the moved logs. A result that changes a lot over a few milliseconds of shift depends on the tie."],
-    attrGroups: ["What each group of attributes measures", "The bars are colored by what each attribute measures. Waveform attributes (blue: the stack amplitudes, relative acoustic impedance, AVT, the quadrature trace and the phase attributes) follow the oscillation of the trace between peaks and troughs, or are band-limited with no low frequencies, so their average over an interval is close to zero whatever the rock, and two classes rarely differ in their mean values. Quantitative interpretation reaches the properties of an interval from the same data by inversion with a low-frequency model, which this tool does not do. Envelope and energy attributes (brown: RMS amplitude, envelope, sweetness), amplitude change with angle measured on envelopes (purple: far minus near), frequency attributes (teal: instantaneous frequency, spectral ratio), geometric attributes (gray: dip, dip variability, coherence) and the DQ attributes (rose) each turn the waveform into a measure of the character of an interval, so their averages can differ from one rock to another."],
+    attrGroups: ["What each group of attributes measures", "The bars are colored by what each attribute measures. Waveform attributes (blue: the stack amplitudes, relative acoustic impedance, AVT, the quadrature trace and the phase attributes) follow the oscillation of the trace between peaks and troughs, or are band-limited with no low frequencies, so their average over an interval is close to zero whatever the rock, and two classes rarely differ in their mean values. Quantitative interpretation reaches the properties of an interval from the same data by inversion with a low-frequency model, which this tool does not do. Envelope and energy attributes (brown: RMS amplitude, envelope, sweetness), amplitude change with angle measured on envelopes (purple: far minus near), frequency attributes (teal: instantaneous frequency, spectral ratio) and geometric attributes (gray: dip, dip variability, coherence) each turn the waveform into a measure of the character of an interval, so their averages can differ from one rock to another. The DQ attributes (rose) describe individual half cycles: DQ changes sign from one half cycle to the next, so like the waveform attributes its average over an interval is close to zero, and it is compared with logs sample by sample, as a curve shape, and not through interval averages."],
     helpQiCorr: ["Reading the correlation bars", "One bar per attribute: the correlation coefficient between that attribute and the log, for the same well, interval, averaging window and trend setting as the crossplot. A bar to the right means the attribute tends to be higher where the log is higher; a bar to the left means it tends to be lower. The red bar is the attribute on the horizontal axis. Switching the trend setting on and off shows which correlations come from both quantities changing with two-way time."],
     zscore: ["Standard deviations", "Each attribute is rescaled by subtracting its mean and dividing by its standard deviation over the whole window, so attributes with different units can be compared."],
     shap: ["SHAP values", "Shapley additive explanations (Lundberg and Lee, 2017). For one sample, each attribute receives the change it makes to the model output, averaged over the orders in which attributes can be added. Here the output is the sample's position on the SOM grid, which sets its color. The average position of all samples plus every attribute's SHAP value gives the sample's position. Values are estimated from random attribute orderings (Strumbelj and Kononenko, 2014)."],
@@ -1131,10 +1131,65 @@
     const q = state.qi, tr = [{ type: "units", w: 0.9 }, { type: "curve", keys: ["GR"] }];
     if (well.curves.PHID) tr.push({ type: "curve", keys: ["PHID", "NPHI"] });
     if (well.curves.DRILL) tr.push({ type: "curve", keys: ["DRILL"] });
+    if (q.mode === "log" && isDq(q.x)) {   // DQ at 2 ms beside the logs, and relative acoustic impedance for comparison
+      tr.push({ type: "dqwig", w: 1.4 }, { type: "attr", key: "relative_acoustic_impedance" });
+      if (q.x !== "dq") tr.push({ type: "attr", key: q.x });
+      return tr;
+    }
     tr.push({ type: "curve", keys: ["TEMP"] }, { type: "attr", key: q.x });
     if (q.mode === "attr") tr.push({ type: "attr", key: q.y2 });
     return tr;
   }
+  /* DQ at 2 ms along the well as an unfilled wiggle, with the log porosity drawn over it on a fixed scale, and the
+     correlation of the two at 2 ms for the current tie shift */
+  const DQ_PHI = [0.15, 0.45];
+  function dqAlongWell(well) {
+    const W = meta.dq_wiggle, kmStep = (meta.grid.km_max - meta.grid.km_min) / (W.nx - 1), t0 = well.t0, t1 = well.t0 + well.n * well.dt;
+    const tj = well.grid.j.map(gridT), out = [];
+    for (let j = 0; j < W.nt; j++) {
+      const t = W.t_min + j * W.dt; if (t < t0 || t > t1 || t > tj[tj.length - 1] || t < tj[0]) continue;
+      let k = 0; while (k < tj.length - 2 && tj[k + 1] < t) k++;
+      const km = well.grid.km[k] + (well.grid.km[k + 1] - well.grid.km[k]) * (t - tj[k]) / (tj[k + 1] - tj[k]);
+      const i = Math.round((km - meta.grid.km_min) / kmStep);
+      let v = 0, n = 0; for (let ii = Math.max(0, i - 1); ii <= Math.min(W.nx - 1, i + 1); ii++) { v += dqWiggle[ii * W.nt + j]; n++; }
+      out.push({ t, v: v / n });
+    }
+    return out;
+  }
+  function phiAt(well, t, halfWin) {   // log porosity averaged over t ± halfWin, with the tie shift applied
+    const c = well.curves.PHID; if (!c) return null;
+    const a = Math.max(0, Math.round((t - sh() - halfWin - well.t0) / well.dt)), b = Math.min(well.n - 1, Math.round((t - sh() + halfWin - well.t0) / well.dt));
+    let s = 0, n = 0; for (let k = a; k <= b; k++) if (c.values[k] != null) { s += c.values[k]; n++; }
+    return n ? s / n : null;
+  }
+  function drawDqTrack(g, t, well, Y, T, B, h) {
+    const W = meta.dq_wiggle, mid = (t.x0 + t.x1) / 2, half = (t.x1 - t.x0) / 2 - 2;
+    g.strokeStyle = "#5a5446"; g.strokeRect(t.x0, T, t.x1 - t.x0, h - T - B);
+    g.fillStyle = "#1f1d18"; g.textAlign = "center"; g.textBaseline = "alphabetic"; g.font = "600 11px Barlow, Arial, sans-serif";
+    g.fillText("DQ, 2 ms", mid, T - 30);
+    g.fillStyle = CURVE_COLOR.PHID; g.fillText("Density φ", mid, T - 19);
+    g.font = "10px Barlow, Arial, sans-serif"; g.fillStyle = "#5a5446"; g.textAlign = "left"; g.fillText(`−${W.max} · ${DQ_PHI[0]}`, t.x0 + 1, T - 4);
+    g.textAlign = "right"; g.fillText(`${W.max} · ${DQ_PHI[1]}`, t.x1 - 1, T - 4);
+    if (!dqWiggle) return;
+    const pts = dqAlongWell(well);
+    g.save(); g.beginPath(); g.rect(t.x0, T, t.x1 - t.x0, h - T - B); g.clip();
+    g.strokeStyle = "rgba(90,84,70,.4)"; g.lineWidth = 0.8; g.beginPath(); g.moveTo(mid, T); g.lineTo(mid, h - B); g.stroke();
+    if (well.curves.PHID) {   // porosity on the same track, increasing to the right, so a match in shape shows directly
+      g.strokeStyle = CURVE_COLOR.PHID; g.lineWidth = 1.6; g.beginPath(); let on = false;
+      for (const p of pts) { const v = phiAt(well, p.t, 0.001); if (v == null) { on = false; continue; }
+        const x = mid + Math.max(-1, Math.min(1, (v - (DQ_PHI[0] + DQ_PHI[1]) / 2) / ((DQ_PHI[1] - DQ_PHI[0]) / 2))) * half; on ? g.lineTo(x, Y(p.t)) : g.moveTo(x, Y(p.t)); on = true; }
+      g.stroke();
+    }
+    g.strokeStyle = "#000"; g.lineWidth = 1.1; g.beginPath();
+    pts.forEach((p, i) => { const x = mid + Math.max(-1, Math.min(1, p.v / W.max)) * half; i ? g.lineTo(x, Y(p.t)) : g.moveTo(x, Y(p.t)); });
+    g.stroke(); g.restore();
+    if (well.curves.PHID) {
+      const pr = pts.map((p) => ({ x: p.v, y: phiAt(well, p.t, 0.001) })).filter((p) => p.y != null), r = corr(pr);
+      g.font = "600 10.5px Barlow, Arial, sans-serif"; g.fillStyle = "#1f1d18"; g.textAlign = "center";
+      g.fillText(r == null ? "" : `r = ${r.toFixed(2)} at 2 ms`, mid, T - 41);
+    }
+  }
+
   let wellGeom = null;
   function drawWellPanel() {
     const c = $("#wellPanel"), s = sizeCanvas(c); if (!s) return;
@@ -1169,6 +1224,7 @@
         }
         g.restore(); g.font = "11px Barlow, Arial, sans-serif"; continue;
       }
+      if (t.type === "dqwig") { drawDqTrack(g, t, well, Y, T, B, h); continue; }
       const keys = t.type === "attr" ? [t.key] : t.keys;
       const info = (k) => (t.type === "attr" ? { label: shortName(k), unit: meta.attributes[k].unit, min: meta.attributes[k].min, max: meta.attributes[k].max } : well.curves[k]);
       const i0 = info(keys[0]);
@@ -1272,6 +1328,7 @@
     $("#qiCutRow").hidden = !classOn(); $("#qiCut").value = cutNow(); $("#qiCutText").textContent = `${cutNow()} API`;
     $("#qiShift").value = state.qi.shift; $("#qiShiftText").textContent = state.qi.shift ? `${state.qi.shift > 0 ? "+" : ""}${state.qi.shift} ms, logs and tops moved ${state.qi.shift > 0 ? "down" : "up"}` : "0 ms";
     $("#qiPolyInfo").textContent = state.qi.closed && qiMaskInfo ? `${(qiMaskInfo.share * 100).toFixed(1)}% of the samples in the study window (0–40 km, 0.15–2.0 s) fall inside the polygon, shown in yellow on the section.` : "";
+    if (state.qi.mode === "log" && isDq(state.qi.x) && !dqWiggle) await loadWiggle();
     drawWellPanel(); drawQiCorr(); drawQiLegend(); await drawXplot();
   }
 
@@ -1312,9 +1369,10 @@
     4: { well: "ASTEN-GT-02", mode: "log", x: "rms_amplitude", y: "PHID", color: "twt", win: 0, detrend: false, shift: 0, unit: "all", zoom: "someren" },
     5: { well: "ASTEN-GT-02", mode: "log", x: "rms_amplitude", y: "PHID", color: "twt", win: 0, detrend: true, shift: 0, unit: "all", zoom: "someren" },
     6: { well: "ASTEN-GT-02", mode: "log", x: "spectral_ratio", y: "GR", color: "class", cut: 65, win: 0, detrend: false, shift: 8, unit: "pkg:0", zoom: "someren" },
-    7: { well: "ASTEN-GT-02", mode: "attr", x: "spectral_ratio", y2: "far_minus_near", colorLog: "class", cut: 65, win: 0, shift: 0, unit: "pkg:0", zoom: "study" },
-    8: { well: "ASTEN-GT-02", mode: "log", x: "spectral_ratio", y: "GR", color: "class", cut: 65, win: 0, detrend: false, shift: 0, unit: "pkg:0", zoom: "study", som: true },
-    9: { well: "ASTEN-GT-02", mode: "log", x: "rms_amplitude", y: "GR", color: "unit", win: 0, detrend: false, shift: 0, unit: "Houthem Formation", zoom: "someren" },
+    7: { well: "ASTEN-GT-02", mode: "log", x: "dq", y: "PHID", color: "unit", win: 0, detrend: false, shift: 0, unit: "all", zoom: "someren" },
+    8: { well: "ASTEN-GT-02", mode: "attr", x: "spectral_ratio", y2: "far_minus_near", colorLog: "class", cut: 65, win: 0, shift: 0, unit: "pkg:0", zoom: "study" },
+    9: { well: "ASTEN-GT-02", mode: "log", x: "spectral_ratio", y: "GR", color: "class", cut: 65, win: 0, detrend: false, shift: 0, unit: "pkg:0", zoom: "study", som: true },
+    10: { well: "ASTEN-GT-02", mode: "log", x: "rms_amplitude", y: "GR", color: "unit", win: 0, detrend: false, shift: 0, unit: "Houthem Formation", zoom: "someren" },
   };
 
   /* the attributes that separate the gamma ray classes most at the current well and interval, skipping any that
