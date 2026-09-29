@@ -2,6 +2,8 @@
 
 An interactive board for a guided lecture, prepared by attribute specialists for an audience that includes quantitative interpretation (QI) practitioners, on what seismic attributes can add alongside QI work: how well logs are used to test and choose attributes, the checks that decide whether an attribute–log relationship holds (depth trend, averaging scale, well tie, redundancy, sample count), and how a machine learning model built on the chosen attributes can be checked with SHAP. The tool contains no inversion, Vp/Vs, intercept or gradient, so it does not compare attributes with QI results.
 
+The exercise runs in two parts, listed in a panel shown on every stage. In part 1 the well inside the Someren license, ASTEN-GT-02, is hidden, and the prospect is explored from CAL-GT-04 at Californië: tying the well tops, picking the Houthem Formation westward across the fault zone, grouping samples at CAL-GT-04 by the tops (Houthem and Maastricht against the Landen Clay to Swalmen members) to find the attributes that change at the top of the chalk, plotting an attribute along the pick, training a SOM on the attributes chosen there, showing where the classes of the Californië Houthem occur along the line, and checking them with SHAP. The last step reveals ASTEN-GT-02 and reports the Houthem top in the well against the pick at that position, and the share of the well's Houthem samples that fall on the Californië Houthem neurons. Part 2, available after the reveal, is the well-log part: gamma ray classes, the trend with time, the averaging window, the well tie, the polygon and the log-selected SOM.
+
 The page loads precomputed data and trains the SOM in the browser, so it runs on GitHub Pages or any static web server.
 
 ## Exercise
@@ -63,7 +65,7 @@ python build_data.py
 | 6b | `step6b_dq.py` | the DQ attributes on the 4 ms attribute grid (`data/attr_dq*.bin`, `attr_theta_px.bin`, `attr_signed_*.bin`), DQ at 2 ms for the wiggles (`data/dq_wiggle.bin`), and their entries in `meta.json`; reads only the `data/` folder of the scan-dq repository (path in `DQ_DATA` in `python/config.py`) |
 | 8 | `step8_logs.py` | `data/logs.json`: logs in two-way time and the attributes along each well path; runs from `data/` and the log files alone |
 
-Well inputs are in `python/inputs/`: formation tops from NLOG, and deviation survey stations (a subset of the NLOG survey stations; the full survey can replace the file in the same column format). Log inputs are in `python/inputs/logs/`: the ASTEN-GT-02 composite (gamma ray, bulk density, density correction, neutron) and temperature log, the CAL-GT-04 mud-logging data (gamma ray while drilling, drilling time), and CAL-GT-04 temperature extracted from the cased-hole log `CAL-GT-04_CL_RDR.las` and resampled to 1 m. Step 8 needs only `data/meta.json`, `data/attr_*.bin` and these files, so after a change to the logs or tops it can be run on its own with `python step8_logs.py`.
+Well inputs are in `python/inputs/`: formation tops from NLOG, and deviation survey stations (a subset of the NLOG survey stations; the full survey can replace the file in the same column format). Log inputs are in `python/inputs/logs/`: the ASTEN-GT-02 composite (gamma ray, bulk density, density correction, neutron) and temperature log, the CAL-GT-04 gamma ray measured while drilling (LWD; Weatherford run from 815 m and Scientific Drilling run to 3021 m, joined at 1771 m) and mud-logging data (drilling time), and CAL-GT-04 temperature extracted from the cased-hole log `CAL-GT-04_CL_RDR.las` and resampled to 1 m. Step 8 needs only `data/meta.json`, `data/attr_*.bin` and these files, so after a change to the logs or tops it can be run on its own with `python step8_logs.py`.
 
 ## Methods and limitations
 
@@ -100,7 +102,7 @@ Attributes other than relative acoustic impedance and AVT are averaged over a 14
 - Geothermal licenses: Someren exploration license (Staatscourant 2020, 39740); target depth range from the developer as reported by Groenten & Fruit Actueel (January 2025).
 - DQ attributes: computed in AASPI from the SCAN029 near and far stacks (scan-dq repository).
 - Seismic: SCAN 2D line L2EBN2020ASCAN029, acquired 2020 and processed 2021 for EBN and TNO, available through NLOG (nlog.nl).
-- Well: CAL-GT-04, Californië Lipzig Gielen Geothermie B.V., formation tops, deviation survey, mud-logging data and cased-hole temperature log from NLOG.
+- Well: CAL-GT-04, Californië Lipzig Gielen Geothermie B.V., formation tops, deviation survey, LWD gamma ray, mud-logging data and cased-hole temperature log from NLOG.
 - Well: ASTEN-GT-02, TNO, composite and temperature logs and the geological end-of-well report (1987) from NLOG; tops from TNO report 2021 R10829.
 
 ## References

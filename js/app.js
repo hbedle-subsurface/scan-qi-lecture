@@ -247,6 +247,7 @@
     if (s === 2) drawGeologyOverlay();
     if (wigglesOn()) drawWiggles();
     if (s === 8) drawQiMarker();
+    drawHouthemPick();
     if (isSom(s) && run() && !comparing) { const w = run().window; cx.save(); clipPlot(); cx.setLineDash([10, 5]); cx.strokeStyle = "#ffffff"; cx.lineWidth = 1.5;
       cx.strokeRect(X(w.km[0]), Y(w.t[0]), X(w.km[1]) - X(w.km[0]), Y(w.t[1]) - Y(w.t[0])); cx.restore(); }
     drawAxes(control);
@@ -389,7 +390,7 @@
   // 2021 TNO revision where the 1987 unit maps onto one unit, and the producing Dinantian carbonate at Californië
   const TARGETS = {
     "ASTEN-GT-02": new Set(["Voort Member", "Reusel Member", "Houthem Formation"]),
-    "CAL-GT-04": new Set(["Zeeland Formation"]),
+    "CAL-GT-04": new Set(["Zeeland Formation", "Houthem Formation"]),
     "CAL-GT-01": new Set(["Zeeland Formation"]),
   };
   const topLabelText = (wellName, unit) =>
@@ -516,6 +517,7 @@
     $$(".dqWiggle8").forEach((el) => (el.hidden = !(state.qi.mode === "log" && isDq(state.qi.x))));
     if (wigglesOn() && !dqWiggle) await loadWiggle();
     if (state.stage === 8) drawQi();
+    drawPickProfile();
     drawSomGrid($("#somGrid")); drawSomGrid($("#somGridVerdict")); updateNeuronInfo();
     for (const [id, idx] of [["#somGridA", state.runA], ["#somGridB", state.runB]]) { const c = $(id); if (c && state.runs[idx]) drawGridFor(c, state.runs[idx]); } drawShapGlobal(); drawShapSample();
     draw();
@@ -528,7 +530,7 @@
     if (n === 7) setZoom("someren");
     if (n === 2) setZoom("study");
     $$(".tag").forEach((b) => b.setAttribute("aria-current", String(+b.dataset.stage === n)));
-    $$(".card").forEach((c) => (c.hidden = +c.dataset.for !== n));
+    $$(".card[data-for]").forEach((c) => (c.hidden = +c.dataset.for !== n));
     $("#qiPanel").hidden = n !== 8; document.body.classList.toggle("stage-qi", n === 8);
     $(".notes").scrollTop = 0;
     refresh();
@@ -845,6 +847,7 @@
       if (e.target !== cv) return;
       const [x, y] = pos(e), km = invX(x), t = invY(y), v = view();
       if (km < v.kmA || km > v.kmB || t < v.tA || t > v.tB) return;
+      if (state.explore.picking) return addPickPoint(km, t);
       if (state.stage === 1 && PICK_MODE) return pickAt(km, t, e.shiftKey);
       if (state.stage === 5 && run()) { state.sample = { km, t }; requestExplain(); draw(); }
     });
@@ -917,7 +920,13 @@
     const u = w.units.find((v) => v.name === sel); return u ? { top: u.top_twt + sh(), base: u.base_twt + sh(), label: unitShort(u.name) } : null;
   }
   const CLASS_COLORS = ["#e9b949", "#2f5d62"];   // gamma ray below the cutoff, at or above it
-  const classOn = () => (state.qi.mode === "log" ? state.qi.color : state.qi.colorLog) === "class";
+  // two groups of formations from the well tops, for wells where the interval of interest has no gamma ray
+  const FM_CLASSES = { "CAL-GT-04": { labels: ["Landen Clay to Swalmen members", "Houthem and Maastricht formations"],
+    groups: [["Landen Clay Member", "Gelinden Member", "Heers Member", "Swalmen Member"], ["Houthem Formation", "Maastricht Formation"]], colors: ["#8ab17d", "#c77dff"] } };
+  const classKind = () => { const k = state.qi.mode === "log" ? state.qi.color : state.qi.colorLog; return k === "class" ? "gr" : k === "fmclass" ? "fm" : null; };
+  const classOn = () => classKind() != null;
+  const classColors = () => (classKind() === "fm" ? FM_CLASSES[state.qi.well].colors : CLASS_COLORS);
+  const fmY = (w) => (w.curves.DRILL ? "DRILL" : "GR");   // a log present over the whole grouped interval
   const cutNow = () => state.qi.cuts[state.qi.well];
   const lutColor = (lut, u) => lut[Math.max(0, Math.min(255, Math.round(u * 255)))];
   const CURVE_COLOR = { GR: "#2a9d8f", PHID: "#c8362d", NPHI: "#3a6ea5", RHOB: "#6d597a", TEMP: "#e76f51", DRILL: "#8d6e63" };
@@ -952,7 +961,7 @@
   function qiSamples(xKey = state.qi.x, q = state.qi) {
     const w = qw(), g = w.grid, xs = g.attrs[xKey];
     const ys = q.mode === "log" ? blockedCurve(w, q.y) : g.attrs[q.y2];
-    const cKey = q.mode === "attr" ? q.colorLog : q.color, byClass = cKey === "class";
+    const cKey = q.mode === "attr" ? q.colorLog : q.color, byClass = cKey === "class", fm = cKey === "fmclass" ? FM_CLASSES[w.name] : null;
     const cs = byClass ? blockedCurve(w, "GR") : w.curves[cKey] ? blockedCurve(w, cKey) : null, cut = q.cuts[w.name], iv = intervalOf(w, q.unit);
     const out = [];
     g.j.forEach((j, k) => {
@@ -960,8 +969,11 @@
       if (iv && (t < iv.top || t >= iv.base)) return;
       const x = xs[k], y = ys ? ys[k] : null, c = cs ? cs[k] : null;
       if (x == null || y == null) return;
-      if ((q.mode === "attr" || byClass) && c == null) return;
-      out.push({ k, j, t, km: g.km[k], x, y, x0: x, y0: y, c, u, cls: byClass ? (c >= cut ? 1 : 0) : null });
+      if (cKey === "fmclass" && !fm) return;
+      const gi = fm ? fm.groups.findIndex((gr) => u && gr.includes(u.name)) : -1;
+      if (fm && gi < 0) return;
+      if (((q.mode === "attr" && !fm) || byClass) && c == null) return;
+      out.push({ k, j, t, km: g.km[k], x, y, x0: x, y0: y, c, u, cls: byClass ? (c >= cut ? 1 : 0) : fm ? gi : null });
     });
     if (q.mode === "log" && q.detrend && out.length > 2) {
       for (const key of ["x", "y"]) { const f = fitLine(out, key); out.forEach((p) => (p[key] -= f(p.t))); }
@@ -1056,7 +1068,7 @@
     const cKey = q.mode === "attr" ? q.colorLog : q.color, curve = well.curves[cKey], vir = meta.luts.viridis.lut;
     const tRange = [well.t0, well.t0 + well.n * well.dt];
     const colorOf = (p) => {
-      if (p.cls != null) return CLASS_COLORS[p.cls];
+      if (p.cls != null) return classColors()[p.cls];
       if (q.mode === "log" && q.color === "unit") return p.u ? p.u.color : "#999";
       if (q.mode === "log" && q.color === "twt") return `rgb(${lutColor(vir, (p.t - tRange[0]) / (tRange[1] - tRange[0]))})`;
       return p.c == null ? "#bbb" : `rgb(${lutColor(vir, (p.c - curve.min) / (curve.max - curve.min))})`;
@@ -1107,10 +1119,11 @@
     const rTxt = r == null ? "r not computed for fewer than 5 samples" : `r = ${r.toFixed(2)}`;
     g.fillText(`${well.name}, ${where}: n = ${pts.length}, ${rTxt}${q.mode === "attr" && r != null ? " between the two attributes" : ""}`, 8, 12);
     if (classOn()) {   // class key
-      const n1 = pts.filter((p) => p.cls === 1).length, lab = [`Gamma ray below ${cutNow()} API (${pts.length - n1})`, `${cutNow()} API or more (${n1})`];
+      const n1 = pts.filter((p) => p.cls === 1).length, fmL = classKind() === "fm" ? FM_CLASSES[well.name].labels : null;
+      const lab = fmL ? [`${fmL[0]} (${pts.length - n1})`, `${fmL[1]} (${n1})`] : [`Gamma ray below ${cutNow()} API (${pts.length - n1})`, `${cutNow()} API or more (${n1})`];
       g.font = "11.5px Barlow, Arial, sans-serif"; g.textBaseline = "middle"; g.textAlign = "left";
       let xx = w - XP.r - lab.reduce((a, l) => a + g.measureText(l).width + 26, 0);
-      lab.forEach((l, i) => { g.fillStyle = CLASS_COLORS[i]; g.beginPath(); g.arc(xx + 5, 31, 5, 0, Math.PI * 2); g.fill(); g.strokeStyle = "#1f1d18"; g.lineWidth = 0.7; g.stroke();
+      lab.forEach((l, i) => { g.fillStyle = classColors()[i]; g.beginPath(); g.arc(xx + 5, 31, 5, 0, Math.PI * 2); g.fill(); g.strokeStyle = "#1f1d18"; g.lineWidth = 0.7; g.stroke();
         g.fillStyle = "#1f1d18"; g.fillText(l, xx + 13, 31); xx += g.measureText(l).width + 26; });
     } else if (!(q.mode === "log" && q.color === "unit")) {
       const bw = 110, x0 = w - XP.r - bw - 34, y0 = 27;
@@ -1217,7 +1230,13 @@
           if (b - a > 11) { g.fillStyle = "#10151a"; g.font = `${u.target ? 700 : 500} 10px Barlow, Arial, sans-serif`; g.textAlign = "left"; g.textBaseline = "middle";
             g.fillText(unitShort(u.name) + (u.target ? " *" : ""), t.x0 + 3, (a + b) / 2, t.x1 - t.x0 - 5); }
         }
-        if (classOn() && well.curves.GR) {   // gamma ray class of each attribute sample, as a strip on the right of the column
+        if (classKind() === "fm" && FM_CLASSES[well.name]) {   // formation group of each attribute sample, as a strip on the right of the column
+          const F = FM_CLASSES[well.name], sw = 9;
+          well.grid.j.forEach((j) => { const tt = gridT(j), u = unitAt(well, tt), gi = F.groups.findIndex((gr) => u && gr.includes(u.name)); if (gi < 0) return;
+            g.fillStyle = F.colors[gi]; g.fillRect(t.x1 - sw, Y(tt - 0.002), sw, Math.max(1, Y(tt + 0.002) - Y(tt - 0.002))); });
+          g.strokeStyle = "#1f1d18"; g.lineWidth = 0.6; g.beginPath(); g.moveTo(t.x1 - sw, T); g.lineTo(t.x1 - sw, h - B); g.stroke();
+        }
+        if (classKind() === "gr" && well.curves.GR) {   // gamma ray class of each attribute sample, as a strip on the right of the column
           const gr = blockedCurve(well, "GR"), cut = cutNow(), sw = 9;
           well.grid.j.forEach((j, i) => { if (gr[i] == null) return; const tt = gridT(j); g.fillStyle = CLASS_COLORS[gr[i] >= cut ? 1 : 0]; g.fillRect(t.x1 - sw, Y(tt - 0.002), sw, Math.max(1, Y(tt + 0.002) - Y(tt - 0.002))); });
           g.strokeStyle = "#1f1d18"; g.lineWidth = 0.6; g.beginPath(); g.moveTo(t.x1 - sw, T); g.lineTo(t.x1 - sw, h - B); g.stroke();
@@ -1242,7 +1261,7 @@
         g.strokeStyle = t.type === "attr" ? "#1f1d18" : CURVE_COLOR[k]; g.lineWidth = 1.8; g.setLineDash(k === "NPHI" ? [5, 3] : []); g.beginPath(); let on = false;
         well.grid.j.forEach((j, i) => { const val = vals[i]; if (val == null) { on = false; return; } const yy = Y(gridT(j)); on ? g.lineTo(XV(val), yy) : g.moveTo(XV(val), yy); on = true; }); g.stroke(); g.setLineDash([]);
       }
-      if (classOn() && keys.includes("GR")) {   // the cutoff on the gamma ray track
+      if (classKind() === "gr" && keys.includes("GR")) {   // the cutoff on the gamma ray track
         g.strokeStyle = "#9d0208"; g.lineWidth = 1.4; g.setLineDash([5, 3]); g.beginPath(); g.moveTo(XV(cutNow()), T); g.lineTo(XV(cutNow()), h - B); g.stroke(); g.setLineDash([]);
       }
       g.restore();
@@ -1284,8 +1303,8 @@
     const q = state.qi, well = qw(), c = $("#qiCorr");
     const iv = intervalOf(well, q.unit), where = iv ? iv.label : "logged interval", tr = q.mode === "log" && q.detrend;
     if (classOn()) {
-      // separation of the two gamma ray classes by each attribute: difference of the class means in pooled standard deviations
-      const o = { ...q, mode: "log", y: "GR", color: "class", detrend: tr };
+      // separation of the two classes by each attribute: difference of the class means in pooled standard deviations
+      const fmk = classKind() === "fm", o = { ...q, mode: "log", y: fmk ? (q.mode === "log" ? q.y : fmY(well)) : "GR", color: fmk ? "fmclass" : "class", detrend: tr };
       corrRows = ATTR_ORDER().map((k) => {
         const pts = qiSamples(k, o), a = pts.filter((p) => p.cls === 0).map((p) => p.x), b = pts.filter((p) => p.cls === 1).map((p) => p.x);
         if (a.length < 5 || b.length < 5) return [k, null];
@@ -1293,12 +1312,12 @@
         const ma = m(a), mb = m(b), sd = Math.sqrt((va(a, ma) + va(b, mb)) / 2);
         return [k, sd ? (mb - ma) / sd : null];
       });
-      $("#qiCorrTitle").textContent = `Separation of the gamma ray classes${tr ? ", trend removed" : ""}`;
+      $("#qiCorrTitle").textContent = `Separation of the ${fmk ? "two groups of formations" : "gamma ray classes"}${tr ? ", trend removed" : ""}`;
       $("#qiCorrNote").innerHTML = 'Difference between the class means in <button class="term" data-term="separation">standard deviations</button>, for the samples on the crossplot. Axis fixed at −3 to 3. Clicking a bar puts that attribute on the horizontal axis.' + BAR_KEY;
       $("#qiCorrHelp").dataset.term = "helpQiSep";
       c.height = 26 + 18 * corrRows.length;
       hbars(c, corrRows.map(([k]) => shortName(k)), corrRows.map(([, r]) => (r == null ? NaN : r)),
-        { min: -3, max: 3, colors: corrRows.map(([k]) => barColor(k)), valueFmt: (v) => (Number.isNaN(v) ? "n < 5" : v.toFixed(2)), labelOpposite: true, title: `${where}, cutoff ${cutNow()} API` });
+        { min: -3, max: 3, colors: corrRows.map(([k]) => barColor(k)), valueFmt: (v) => (Number.isNaN(v) ? "n < 5" : v.toFixed(2)), labelOpposite: true, title: fmk ? `${well.name}, groups from the tops` : `${where}, cutoff ${cutNow()} API` });
       return;
     }
     const logKey = q.mode === "log" ? q.y : q.colorLog, o = { ...q, mode: "log", y: logKey, detrend: tr };
@@ -1325,7 +1344,7 @@
   async function drawQi() {
     if (state.stage !== 8 || !logs) return;
     $("#qiWinText").textContent = `${winMs()} ms`;
-    $("#qiCutRow").hidden = !classOn(); $("#qiCut").value = cutNow(); $("#qiCutText").textContent = `${cutNow()} API`;
+    $("#qiCutRow").hidden = classKind() !== "gr"; $("#qiCut").value = cutNow(); $("#qiCutText").textContent = `${cutNow()} API`;
     $("#qiShift").value = state.qi.shift; $("#qiShiftText").textContent = state.qi.shift ? `${state.qi.shift > 0 ? "+" : ""}${state.qi.shift} ms, logs and tops moved ${state.qi.shift > 0 ? "down" : "up"}` : "0 ms";
     $("#qiPolyInfo").textContent = state.qi.closed && qiMaskInfo ? `${(qiMaskInfo.share * 100).toFixed(1)}% of the samples in the study window (0–40 km, 0.15–2.0 s) fall inside the polygon, shown in yellow on the section.` : "";
     if (state.qi.mode === "log" && isDq(state.qi.x) && !dqWiggle) await loadWiggle();
@@ -1335,14 +1354,17 @@
   function fillQiSelects() {
     const q = state.qi, well = qw(), curves = Object.entries(well.curves);
     if (!well.curves[q.y]) q.y = "GR";
-    if (q.colorLog !== "class" && !well.curves[q.colorLog]) q.colorLog = "GR";
-    if (!["unit", "twt", "class"].includes(q.color) && !well.curves[q.color]) q.color = "unit";
+    if (q.colorLog === "fmclass" && !FM_CLASSES[well.name]) q.colorLog = "class";
+    if (q.color === "fmclass" && !FM_CLASSES[well.name]) q.color = "class";
+    if (!["class", "fmclass"].includes(q.colorLog) && !well.curves[q.colorLog]) q.colorLog = "GR";
+    if (!["unit", "twt", "class", "fmclass"].includes(q.color) && !well.curves[q.color]) q.color = "unit";
     const opt = (v, t) => Object.assign(document.createElement("option"), { value: v, textContent: t });
     const ySel = $("#qiY"), cSel = $("#qiColor"), clSel = $("#qiColorLog"), uSel = $("#qiUnit");
     ySel.innerHTML = ""; clSel.innerHTML = ""; cSel.innerHTML = ""; uSel.innerHTML = "";
     for (const [k, cv] of curves) { ySel.append(opt(k, `${cv.label} (${cv.unit})`)); clSel.append(opt(k, `${cv.label} (${cv.unit})`)); }
     clSel.append(opt("class", "Gamma ray class (cutoff)"));
     cSel.append(opt("unit", "Formation"), opt("twt", "Two-way time"), opt("class", "Gamma ray class (cutoff)"));
+    if (FM_CLASSES[well.name]) { clSel.append(opt("fmclass", "Formation groups (tops)")); cSel.append(opt("fmclass", "Formation groups (tops)")); }
     for (const [k, cv] of curves) cSel.append(opt(k, cv.label));
     uSel.append(opt("all", "Whole logged interval"));
     (PACKAGES[well.name] || []).forEach((p, i) => uSel.append(opt(`pkg:${i}`, p[0])));
@@ -1376,8 +1398,9 @@
 
   /* the attributes that separate the gamma ray classes most at the current well and interval, skipping any that
      correlate at 0.9 or more along the well with one already chosen */
-  function chooseForSom(nPick = 4) {
-    const w = qw(), q = state.qi, o = { ...q, mode: "log", y: "GR", color: "class", detrend: false }, rows = [];
+  function chooseForSom(nPick = 4, kind = "gr") {
+    const w = qw(), q = state.qi, rows = [];
+    const o = kind === "fm" ? { ...q, mode: "log", y: fmY(w), color: "fmclass", unit: "all", detrend: false } : { ...q, mode: "log", y: "GR", color: "class", detrend: false };
     for (const k of ATTR_ORDER()) {
       const pts = qiSamples(k, o), a = pts.filter((p) => p.cls === 0).map((p) => p.x), b = pts.filter((p) => p.cls === 1).map((p) => p.x);
       if (a.length < 5 || b.length < 5) continue;
@@ -1427,6 +1450,7 @@
       const { cut, zoom, som, ...rest } = p;
       Object.assign(state.qi, { poly: [], closed: false, hover: null }, rest);
       if (cut != null) state.qi.cuts[p.well] = cut;
+      state.explore.picking = false; $("#pickCtl").hidden = true;
       if (som) {   // the log-selected attributes go to the SOM list, and the page moves to Build a SOM
         const chosen = chooseForSom();
         state.picked = new Set(chosen); syncPicks();
@@ -1435,6 +1459,9 @@
       }
       setZoom(zoom || WELL_STYLE[p.well].zoom);
       $$("#qiSteps [data-qi]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      $$("#exSteps [data-ex]").forEach((x) => x.setAttribute("aria-pressed", "false"));
+      state.explore.picking = false; $("#pickCtl").hidden = true;
+      if (state.stage !== 8) setStage(8);
       qiChanged();
     }));
     $("#qiPolyClear").addEventListener("click", () => { Object.assign(state.qi, { poly: [], closed: false }); refresh(); });
@@ -1490,6 +1517,162 @@
     cx.lineWidth = 2; cx.strokeStyle = "#e63946"; cx.stroke(); cx.restore();
   }
 
+  /* ---------- Part 1 of the exercise: exploring the Someren area from Californië, with ASTEN-GT-02 hidden until the reveal ---------- */
+  const HIDDEN_WELL = "ASTEN-GT-02", HOUTHEM = "Houthem Formation";
+  state.explore = { revealed: false, pick: [], picking: false, houthemNeurons: null };
+  const wellMeta = (name) => (meta.wells || []).find((w) => w.name === name);
+  const pathAt = (w, t) => {   // km of a well path at two-way time t
+    const p = w.path.filter((q, i) => i === 0 || q.twt > w.path[i - 1].twt);
+    if (t <= p[0].twt) return p[0].km;
+    for (let i = 1; i < p.length; i++) if (p[i].twt >= t) return p[i - 1].km + (p[i].km - p[i - 1].km) * (t - p[i - 1].twt) / (p[i].twt - p[i - 1].twt);
+    return p[p.length - 1].km;
+  };
+  function unitRange(w, unit) {   // top and base two-way time of a unit in a well, from the tops
+    const tops = [...w.tops].sort((a, b) => a.twt - b.twt), i = tops.findIndex((t) => t.unit === unit); if (i < 0) return null;
+    const base = i + 1 < tops.length ? tops[i + 1].twt : Math.max(...w.path.map((p) => p.twt));
+    return [tops[i].twt, base];
+  }
+
+  function applyHidden() {
+    const hid = !state.explore.revealed;
+    if (hid) state.hiddenWells.add(HIDDEN_WELL); else state.hiddenWells.delete(HIDDEN_WELL);
+    const chip = $(`#wellChips [data-well="${HIDDEN_WELL}"]`); if (chip) { chip.hidden = hid; chip.setAttribute("aria-pressed", String(!hid)); }
+    const wb = $(`#qiWell [data-well="${HIDDEN_WELL}"]`); if (wb) wb.hidden = hid;
+    if (hid && state.qi.well === HIDDEN_WELL) state.qi.well = "CAL-GT-04";
+    $$(".beforeReveal").forEach((el) => (el.hidden = !hid));
+    $$(".afterReveal").forEach((el) => (el.hidden = hid));
+    $$("#qiSteps [data-qi]").forEach((b) => (b.disabled = hid));
+  }
+
+  /* the student's Houthem pick: points in km and two-way time, kept in order along the line */
+  function pickT(km) {
+    const p = state.explore.pick; if (p.length < 2 || km < p[0][0] || km > p[p.length - 1][0]) return null;
+    for (let i = 1; i < p.length; i++) if (p[i][0] >= km) return p[i - 1][1] + (p[i][1] - p[i - 1][1]) * (km - p[i - 1][0]) / (p[i][0] - p[i - 1][0]);
+    return null;
+  }
+  function addPickPoint(km, t) {
+    const p = state.explore.pick; p.push([km, t]); p.sort((a, b) => a[0] - b[0]);
+    updatePickInfo(); draw(); drawPickProfile();
+  }
+  function updatePickInfo() {
+    const p = state.explore.pick;
+    $("#pickInfo").textContent = p.length ? `${p.length} point${p.length > 1 ? "s" : ""}, ${p[0][0].toFixed(1)}–${p[p.length - 1][0].toFixed(1)} km.` : "No points yet.";
+    $("#pickProfileWrap").hidden = !(p.length >= 2 && state.stage <= 3);
+  }
+  function drawHouthemPick() {
+    const p = state.explore.pick; if (!p.length) return;
+    cx.save(); clipPlot(); cx.lineJoin = "round";
+    for (const [col, w] of [["#000", 5], ["#00e5ff", 2.4]]) { cx.strokeStyle = col; cx.lineWidth = w; cx.beginPath(); p.forEach(([k, t], i) => (i ? cx.lineTo : cx.moveTo).call(cx, X(k), Y(t))); cx.stroke(); }
+    for (const [k, t] of p) { cx.fillStyle = "#00e5ff"; cx.strokeStyle = "#000"; cx.lineWidth = 1.2; cx.beginPath(); cx.arc(X(k), Y(t), 3.5, 0, Math.PI * 2); cx.fill(); cx.stroke(); }
+    const [k0, t0] = p[0]; cx.font = "700 11px Barlow, Arial, sans-serif"; cx.textBaseline = "bottom"; cx.textAlign = "left";
+    const lab = "Houthem pick", tw = cx.measureText(lab).width + 8; cx.fillStyle = "rgba(20,24,26,.85)"; cx.fillRect(X(k0) + 6, Y(t0) - 20, tw, 15); cx.fillStyle = "#00e5ff"; cx.fillText(lab, X(k0) + 10, Y(t0) - 6);
+    cx.restore();
+  }
+
+  /* the displayed attribute along the pick: mean of five 4 ms samples centered on the pick at each 20 m trace, fixed axis */
+  function drawPickProfile() {
+    const wrap = $("#pickProfileWrap"), p = state.explore.pick; updatePickInfo();
+    if (wrap.hidden) return;
+    const c = $("#pickProfile"), s = sizeCanvas(c); if (!s) return;
+    const { g, w, h } = s, key = state.attr, A = meta.attributes[key], d = cache[`attr_${key}.bin`], G = meta.grid, v = view();
+    const T = 22, B = 26, PX = (km) => MARGIN.l + (km - v.kmA) / (v.kmB - v.kmA) * (w - MARGIN.l - MARGIN.r), PY = (val) => h - B - (val - A.min) / (A.max - A.min) * (h - T - B);
+    g.fillStyle = "#fffaf0"; g.fillRect(0, 0, w, h);
+    g.strokeStyle = "#5a5446"; g.lineWidth = 1; g.strokeRect(MARGIN.l, T, w - MARGIN.l - MARGIN.r, h - T - B);
+    g.font = "11px Barlow, Arial, sans-serif"; g.fillStyle = "#1f1d18"; g.textAlign = "right"; g.textBaseline = "middle";
+    g.fillText(fmt(A.max), MARGIN.l - 4, T); g.fillText(fmt(A.min), MARGIN.l - 4, h - B);
+    g.textAlign = "left"; g.textBaseline = "top"; g.font = "700 12px Barlow, Arial, sans-serif";
+    g.fillText(`${A.label} along the Houthem pick (mean of five samples, ±8 ms)`, MARGIN.l, 4);
+    // Someren license limits and the wells, as guide lines down from the section
+    const [sa, sb] = meta.someren.km; g.setLineDash([6, 4]); g.strokeStyle = "#2a9d8f";
+    for (const k of [sa, sb]) if (k > v.kmA && k < v.kmB) { g.beginPath(); g.moveTo(PX(k), T); g.lineTo(PX(k), h - B); g.stroke(); }
+    g.setLineDash([]);
+    const marks = [["CAL-GT-04", pathAt(wellMeta("CAL-GT-04"), unitRange(wellMeta("CAL-GT-04"), HOUTHEM)[0]), "#b8860b"]];
+    if (state.explore.revealed) marks.push([HIDDEN_WELL, wellMeta(HIDDEN_WELL).path[0].km, "#7b5ea7"]);
+    g.font = "600 10.5px Barlow, Arial, sans-serif"; g.textBaseline = "top";
+    for (const [n, k, col] of marks) if (k > v.kmA && k < v.kmB) { g.strokeStyle = col; g.lineWidth = 1.5; g.beginPath(); g.moveTo(PX(k), T); g.lineTo(PX(k), h - B); g.stroke(); g.fillStyle = col; g.textAlign = "center"; g.fillText(n, PX(k), h - B + 4); }
+    g.fillStyle = "#1f1d18"; g.textAlign = "center";
+    for (let k = Math.ceil(v.kmA / 5) * 5; k <= v.kmB; k += 5) g.fillText(String(k), PX(k), h - 12);
+    if (!d) { loadBin(`attr_${key}.bin`, Uint8Array).then(() => drawPickProfile()); return; }
+    if (p.length < 2) return;
+    const kmStep = (G.km_max - G.km_min) / (G.nx - 1), jm = lastJ(key);
+    g.save(); g.beginPath(); g.rect(MARGIN.l, T, w - MARGIN.l - MARGIN.r, h - T - B); g.clip();
+    g.strokeStyle = "#be2d28"; g.lineWidth = 1.6; g.beginPath(); let on = false;
+    for (let i = Math.ceil((p[0][0] - G.km_min) / kmStep); i * kmStep + G.km_min <= p[p.length - 1][0]; i++) {
+      const km = G.km_min + i * kmStep, t = pickT(km); if (t == null) continue;
+      const j0 = Math.round((t - meta.t_min) / G.dt); let sum = 0, n = 0;
+      for (let j = j0 - 2; j <= j0 + 2; j++) if (j >= 0 && j <= jm) { sum += A.min + d[i * G.nt + j] / 255 * (A.max - A.min); n++; }
+      if (!n) { on = false; continue; }
+      const x = PX(km), y = PY(sum / n); on ? g.lineTo(x, y) : g.moveTo(x, y); on = true;
+    }
+    g.stroke(); g.restore();
+  }
+
+  /* SOM neurons of the Houthem samples at a well */
+  function neuronsAt(r, wellName) {
+    const w = wellMeta(wellName), rg = unitRange(w, HOUTHEM), G = meta.grid, out = [];
+    if (!rg || !r) return out;
+    for (let j = Math.ceil((rg[0] - meta.t_min) / G.dt); meta.t_min + j * G.dt < rg[1]; j++) {
+      const t = meta.t_min + j * G.dt, i = Math.round((pathAt(w, t) - G.km_min) / (G.km_max - G.km_min) * (G.nx - 1)), k = r.bmu[i * G.nt + j];
+      if (k !== 255) out.push(k);
+    }
+    return out;
+  }
+
+  function revealReport() {
+    const w = wellMeta(HIDDEN_WELL), km = w.path[0].km, top = unitRange(w, HOUTHEM)[0], tp = pickT(km), lines = [];
+    lines.push(`${HIDDEN_WELL} lies at ${km.toFixed(1)} km, ${(w.path[0].offset_m / 1000).toFixed(1)} km from the line. Its Houthem Formation top is at ${top.toFixed(3)} s (1635 m measured depth).`);
+    lines.push(tp == null ? "The Houthem pick does not reach this position along the line." : `The Houthem pick there is at ${tp.toFixed(3)} s, ${Math.abs(Math.round((tp - top) * 1000))} ms ${tp > top ? "below" : "above"} the top in the well.`);
+    const r = run(), set = state.explore.houthemNeurons;
+    if (r && set) {
+      const ks = neuronsAt(r, HIDDEN_WELL), hit = ks.filter((k) => set.has(k)).length;
+      lines.push(`SOM: ${hit} of ${ks.length} Houthem samples at ${HIDDEN_WELL} fall on the neurons of the Houthem at CAL-GT-04.`);
+    }
+    lines.push("At ASTEN-GT-02 the Veldhoven Formation spans 707–1415 m, with the Someren, Wintelre, Voort and Steensel members; at CAL-GT-04 the Veldhoven Clay Member spans 315–500 m.");
+    $("#revealReport").innerHTML = lines.map((l) => `<p class="small">${l}</p>`).join("");
+  }
+
+  const EX_STEPS = {
+    1: () => { Object.assign(state.qi, { well: "CAL-GT-04", mode: "log", x: "rms_amplitude", y: "DRILL", color: "unit", unit: "all", win: 0, detrend: false, shift: 0, poly: [], closed: false, hover: null });
+      setZoom("well"); setStage(8); qiChanged(); },
+    2: () => { state.explore.picking = true; setZoom("study"); setStage(1); },
+    3: () => { Object.assign(state.qi, { well: "CAL-GT-04", mode: "log", y: "DRILL", color: "fmclass", unit: "all", win: 0, detrend: false, shift: 0, poly: [], closed: false, hover: null });
+      setZoom("well"); setStage(8); qiChanged(); },
+    4: () => { const prev = state.qi.well; state.qi.well = "CAL-GT-04"; const best = chooseForSom(1, "fm")[0]; state.qi.well = prev;
+      if (best) { state.attr = best; $("#attrSelect").value = best; drawColorbar(); syncPicks(); }
+      $("#exInfo").textContent = best ? `${meta.attributes[best].label} separates the two groups of formations at CAL-GT-04 most.` : "";
+      setZoom("study"); setStage(3); },
+    5: () => { const prev = state.qi.well; state.qi.well = "CAL-GT-04"; const chosen = chooseForSom(4, "fm"); state.qi.well = prev;
+      state.picked = new Set(chosen); syncPicks();
+      $("#exInfo").textContent = `Chosen at CAL-GT-04 from the formation groups: ${chosen.map((k) => meta.attributes[k].label).join(", ")}. Train the SOM in this stage.`;
+      setZoom("study"); setStage(4); },
+    6: () => { const r = run();
+      if (!r) { $("#exInfo").textContent = "Train a SOM first (step 5)."; setStage(4); return; }
+      const set = new Set(neuronsAt(r, "CAL-GT-04")); state.explore.houthemNeurons = set;
+      r.hidden = new Set([...Array(r.side * r.side).keys()].filter((k) => !set.has(k)));
+      $("#exInfo").textContent = `The Houthem samples at CAL-GT-04 fall on ${set.size} neuron${set.size === 1 ? "" : "s"}; only those classes are shown along the line. The other neurons can be switched back on in the SOM grid.`;
+      setZoom("study"); setStage(4); updateNeuronInfo?.(); },
+    7: () => { setStage(5); },
+    8: () => { state.explore.revealed = true; state.explore.picking = false; applyHidden(); revealReport(); setZoom("someren"); setStage(1); },
+  };
+
+  function wireExplore() {
+    $$("#wellChips button").forEach((b) => { const w = (meta.wells || []).find((x) => x.name === b.textContent); if (w) b.dataset.well = w.name; });
+    $$("#exSteps [data-ex]").forEach((b) => b.addEventListener("click", () => {
+      if (+b.dataset.ex !== 2) state.explore.picking = false;
+      $$("#exSteps [data-ex]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      $$("#qiSteps [data-qi]").forEach((x) => x.setAttribute("aria-pressed", "false"));
+      $("#exInfo").textContent = "";
+      EX_STEPS[b.dataset.ex]();
+      $("#pickCtl").hidden = !state.explore.picking;
+      updatePickInfo(); refresh();
+    }));
+    $("#pickUndo").addEventListener("click", () => { state.explore.pick.pop(); updatePickInfo(); draw(); drawPickProfile(); });
+    $("#pickClearAll").addEventListener("click", () => { state.explore.pick = []; updatePickInfo(); draw(); drawPickProfile(); });
+    $("#pickDone").addEventListener("click", () => { state.explore.picking = false; $("#pickCtl").hidden = true; });
+    new ResizeObserver(() => drawPickProfile()).observe($("#pickProfileWrap"));
+    applyHidden(); updatePickInfo();
+  }
+
   /* ---------- pick mode (open the page with ?pick) ---------- */
   function pickAt(km, t, remove) {
     const unit = $("#pickHorizon").value, list = (picks[unit] ??= []);
@@ -1535,7 +1718,7 @@
     try { logs = await (await fetch("data/logs.json")).json(); } catch (_) { logs = null; }
     autoHorizons = meta.horizons.items;
     baseImg = raster(meta.section.nx, meta.nt, grayAt);
-    wire(); wireWellChips(); wireGeology(); wireBuilder(); wireNeuronToggles(); wireCompare(); wireSomPicks(); setupPickMode(); wireWiggles(); if (logs) wireQi(); drawColorbar(); resize(); refresh();
+    wire(); wireWellChips(); wireGeology(); wireBuilder(); wireNeuronToggles(); wireCompare(); wireSomPicks(); setupPickMode(); wireWiggles(); if (logs) wireQi(); wireExplore(); drawColorbar(); resize(); refresh();
   }
   init();
 })();

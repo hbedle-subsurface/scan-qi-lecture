@@ -3,7 +3,9 @@
 Inputs (python/inputs/logs/, from NLOG):
   ast-gt-02_composite.las    ASTEN-GT-02 gamma ray, bulk density, density correction, neutron (TNO composite, depths below rotary table)
   ast-gt-02_temperature.las  ASTEN-GT-02 temperature log (1987)
-  cal-gt-04_mudlog.las       CAL-GT-04 gamma ray while drilling and drilling time (mud-logging data, 2015-2016)
+  cal-gt-04_lwd_gr_run1_weatherford.las   CAL-GT-04 gamma ray while drilling (LWD), Weatherford run, 815-1774 m, Dec 2015
+  cal-gt-04_lwd_gr_run2_scientific.las    CAL-GT-04 gamma ray while drilling (LWD), Scientific Drilling run, 1770-3021 m, Jan 2016
+  cal-gt-04_mudlog.las       CAL-GT-04 drilling time (mud-logging data, 2015-2016)
   cal-gt-04_temperature.csv  CAL-GT-04 temperature from the cased-hole log CAL-GT-04_CL_RDR.las, resampled to 1 m
 
 Logs are placed in two-way time with the well path from step 2 (measured depth to two-way time from the Dix interval
@@ -19,7 +21,8 @@ import config as C
 
 LOGS = C.INPUTS / "logs"
 DT_LOG = 0.001
-DRHO_MAX = 0.10          # density samples with a larger density correction are treated as bad hole
+DRHO_MAX = 0.10
+LWD_JOIN = 1771.0        # CAL-GT-04: depth where the second LWD gamma ray run takes over from the first          # density samples with a larger density correction are treated as bad hole
 RHO_MATRIX, RHO_FLUID = 2.65, 1.00
 
 # colors for units in the logged intervals: sands yellow to orange, clays and shales green-gray to blue,
@@ -29,11 +32,13 @@ UNIT_COLORS = {
     "Steensel Member": "#c9b27c", "Boom Member": "#5e7c8a", "Berg Member": "#f6bd60", "Reusel Member": "#d62828",
     "Liessel Member": "#6d8f9e", "Gelinden Member": "#a3b18a", "Orp Member": "#fcbf49", "Swalmen Member": "#9c8b7a",
     "Houthem Formation": "#c77dff",
+    "Upper North Sea Group": "#d9c9a3", "Veldhoven Clay Member": "#8ab17d", "Rupel Clay Member": "#5e7c8a", "Vessem Member": "#f6bd60",
+    "Landen Clay Member": "#6d8f9e", "Heers Member": "#fcbf49",
     "Maastricht Formation": "#e0aaff", "Nederweert Sandstone Member": "#f4a261", "Zechstein Upper Claystone Formation": "#8d99ae",
     "Z3 (Leine) Formation": "#9d4edd", "Z2 (Stassfurt) Formation": "#7b2cbf", "Epen Formation": "#4a6fa5",
     "Geverik Member": "#264653", "Zeeland Formation": "#ff5d8f", "Bosscheveld Formation": "#b5838d", "Farne Group": "#6c757d",
 }
-TARGETS = {"ASTEN-GT-02": {"Voort Member", "Reusel Member", "Houthem Formation"}, "CAL-GT-04": {"Zeeland Formation"}}
+TARGETS = {"ASTEN-GT-02": {"Voort Member", "Reusel Member", "Houthem Formation"}, "CAL-GT-04": {"Zeeland Formation", "Houthem Formation"}}
 
 
 def read_las(path, null):
@@ -94,12 +99,18 @@ def main():
             curves["TEMP"] = curve("Temperature", "°C", 0, 100, to_time(tmp[:, 0], tmp[:, 1], md_p, tw_p, t_log))
         else:
             a = read_las(LOGS / "cal-gt-04_mudlog.las", -999.25)
-            z, rop, gr = a[:, 0], a[:, 1], a[:, 2]
+            z, rop = a[:, 0], a[:, 1]
+            # gamma ray from the two LWD runs, joined at 1771 m where the second run begins reading formation
+            r1 = read_las(LOGS / "cal-gt-04_lwd_gr_run1_weatherford.las", -999.25)   # columns DEPT, ROP, HAGRT
+            r2 = read_las(LOGS / "cal-gt-04_lwd_gr_run2_scientific.las", -999.25)    # columns DEPT, GRRT, ROP, T-TEMP
+            k1, k2 = r1[:, 0] < LWD_JOIN, r2[:, 0] >= LWD_JOIN
+            zg = np.r_[r1[k1, 0], r2[k2, 0]]; grv = np.r_[r1[k1, 2], r2[k2, 1]]
+            order = np.argsort(zg); zg, grv = zg[order], grv[order]
             tmp = np.loadtxt(LOGS / "cal-gt-04_temperature.csv", delimiter=",", skiprows=3)
-            md_range = (z[~np.isnan(gr)].min(), z[~np.isnan(gr)].max())
-            md_range = (740.0, md_range[1])          # start above the Houthem Formation so its drilling time is shown
+            md_range = (300.0, zg[~np.isnan(grv)].max())   # from the Veldhoven Clay, so the Cenozoic tops and drilling time are shown
             t_log = np.arange(np.interp(md_range[0], md_p, tw_p), np.interp(md_range[1], md_p, tw_p), DT_LOG).round(4)
-            curves["GR"] = curve("Gamma ray", "API", 0, 200, to_time(z, gr, md_p, tw_p, t_log), "Gamma ray while drilling (mud-logging unit).")
+            curves["GR"] = curve("Gamma ray", "API", 0, 200, to_time(zg, grv, md_p, tw_p, t_log),
+                                 "Gamma ray while drilling (LWD): Weatherford run to 1771 m, Scientific Drilling run below.")
             curves["DRILL"] = curve("Drilling time", "min/m", 0, 50, to_time(z, rop, md_p, tw_p, t_log),
                                     "Minutes to drill one meter: a drilling parameter that also depends on the bit, weight on bit and rotation speed.")
             curves["TEMP"] = curve("Temperature", "°C", 0, 100, to_time(tmp[:, 0], tmp[:, 1], md_p, tw_p, t_log),

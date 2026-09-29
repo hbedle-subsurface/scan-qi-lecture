@@ -17,7 +17,8 @@
     <p>From the Californië geothermal wells to the Someren prospect, southeastern Netherlands</p>
   </div>
   <div class="job" aria-label="Exploration context">
-    <p><strong>Someren license:</strong> candidate aquifers are the intervals tested in ASTEN-GT-02 (1987): the sands of the 1987 Breda Formation (Oosterhout to Veldhoven formations in the 2021 TNO revision), the Voort Member, the Reusel Member (the 1987 Basal Dongen Sand) and the Houthem Formation, with potential for deeper geothermal below the Cenozoic section.</p>
+    <p class="beforeReveal"><strong>Someren license:</strong> the prospect area on the western part of the line, in the Roer Valley Graben. The well inside the license is hidden until the reveal step of the exercise, so the prospect is explored from the Californië wells.</p>
+    <p class="afterReveal" hidden><strong>Someren license:</strong> candidate aquifers are the intervals tested in ASTEN-GT-02 (1987): the sands of the 1987 Breda Formation (Oosterhout to Veldhoven formations in the 2021 TNO revision), the Voort Member, the Reusel Member (the 1987 Basal Dongen Sand) and the Houthem Formation, with potential for deeper geothermal below the Cenozoic section.</p>
     <p><strong>Californië wells:</strong> warm water is produced from the karstified Dinantian carbonate of the Zeeland Formation.</p>
   </div>
   <nav class="stages" aria-label="Stages">
@@ -48,6 +49,7 @@
       <div class="readout" id="readout">Drag a box on the section to zoom. Move over it to read values.</div>
     </div>
     <div class="canvaswrap"><canvas id="section" aria-label="Seismic section display"></canvas></div>
+    <div id="pickProfileWrap" hidden><canvas id="pickProfile" aria-label="Attribute along the Houthem pick"></canvas></div>
     <div class="qi" id="qiPanel" hidden>
       <div class="qi-well"><canvas id="wellPanel" aria-label="Well logs in two-way time"></canvas></div>
       <div class="qi-xplot">
@@ -58,6 +60,42 @@
   </section>
 
   <aside class="notes">
+    <!-- The exercise: shown on every stage -->
+    <details class="card exercise" open>
+      <summary><h2>Exercise</h2></summary>
+      <h3>Part 1. Exploring Someren from Californië</h3>
+      <div class="events" id="exSteps">
+        <button data-ex="1" aria-pressed="false"><b>1. CAL-GT-04 at Californië</b><small>The well tops on the section, and drilling time, temperature and gamma ray (below 815 m) in the well panel</small></button>
+        <button data-ex="2" aria-pressed="false"><b>2. Pick the Houthem toward Someren</b><small>Clicks on the section add points to a Houthem pick, from the well at Californië westward across the fault zone</small></button>
+        <button data-ex="3" aria-pressed="false"><b>3. What changes at the top of the chalk</b><small>Attributes at CAL-GT-04 for the Houthem and Maastricht formations against the Landen Clay to Swalmen members above, grouped by the well tops</small></button>
+        <button data-ex="4" aria-pressed="false"><b>4. An attribute along the Houthem pick</b><small>The attribute that separates the two groups most, on the section and along the pick from Californië to Someren</small></button>
+        <button data-ex="5" aria-pressed="false"><b>5. A SOM from the attributes chosen at Californië</b><small>The four attributes that separate the groups most, skipping near-duplicates, go to Build a SOM</small></button>
+        <button data-ex="6" aria-pressed="false"><b>6. Where the Californië Houthem classes occur</b><small>Only the SOM classes of the Houthem samples at CAL-GT-04 are shown along the line</small></button>
+        <button data-ex="7" aria-pressed="false"><b>7. SHAP</b><small>Which attributes place samples in those classes</small></button>
+        <button data-ex="8" aria-pressed="false"><b>8. Reveal the Someren well</b><small>The well inside the license, its Houthem top compared with the pick, and the SOM classes at the well</small></button>
+      </div>
+      <div id="pickCtl" hidden>
+        <p class="small">Picking is on: clicks on the section add points. Dragging a box still zooms. <span id="pickInfo"></span></p>
+        <div class="row2"><button class="big" id="pickUndo">Remove last point</button><button class="big" id="pickClearAll">Clear pick</button></div>
+        <button class="big" id="pickDone">Done picking</button>
+      </div>
+      <p class="small" id="exInfo"></p>
+      <div id="revealReport"></div>
+      <h3>Part 2. Well logs after the reveal</h3>
+      <p class="small beforeReveal">Available after the reveal.</p>
+      <div class="events afterReveal" id="qiSteps" hidden>
+        <button data-qi="1" aria-pressed="false"><b>1. Zeeland against Epen at CAL-GT-04</b><small>The producing carbonate and the shale above it, split by a gamma ray cutoff, and the attributes that measure interval character separating them</small></button>
+        <button data-qi="2" aria-pressed="false"><b>2. Lithology or depth?</b><small>The same samples with a straight-line trend with time removed from gamma ray and from each attribute</small></button>
+        <button data-qi="3" aria-pressed="false"><b>3. Gamma ray classes from the Someren to the Boom members</b><small>ASTEN-GT-02, where gamma ray changes little with time; the cutoff slider sets the classes</small></button>
+        <button data-qi="4" aria-pressed="false"><b>4. Porosity over the whole logged interval</b><small>Density porosity against RMS amplitude, colored by two-way time; the averaging window slider changes the scale of the logs</small></button>
+        <button data-qi="5" aria-pressed="false"><b>5. Porosity with the trend removed</b><small>The same samples after a straight-line trend with time is subtracted</small></button>
+        <button data-qi="6" aria-pressed="false"><b>6. The well tie</b><small>Logs and tops moved 8 ms down; the tie shift slider moves them up to 16 ms either way</small></button>
+        <button data-qi="7" aria-pressed="false"><b>7. Two attributes and a polygon</b><small>Spectral ratio against far minus near, colored by class; a polygon marks the same combination along the whole line</small></button>
+        <button data-qi="8" aria-pressed="false"><b>8. Attributes chosen at the well, into the SOM</b><small>The four attributes that separate the classes most, skipping near-duplicates, go to Build a SOM</small></button>
+        <button data-qi="9" aria-pressed="false"><b>9. The Houthem Formation</b><small>The target at both wells, where the logs run out</small></button>
+      </div>
+    </details>
+
     <!-- Stage 1 -->
     <div class="card" data-for="1">
       <h2>Line and wells</h2>
@@ -66,7 +104,7 @@
         <label><input type="checkbox" id="showHorizons"> Formation picks</label>
         <label><input type="checkbox" id="showUnits"> Formation group shading</label>
       </fieldset>
-      <p class="small">An asterisk (*) marks a formation named as a candidate geothermal reservoir: the intervals tested in ASTEN-GT-02 at Someren, and the Zeeland Formation at Californië.</p>
+      <p class="small">An asterisk (*) marks a formation named as a candidate geothermal reservoir: the Houthem Formation and the Zeeland Formation at Californië<span class="afterReveal" hidden>, and the intervals tested in ASTEN-GT-02 at Someren</span>.</p>
       <button class="big" id="hideWellControl" aria-pressed="false">Hide all well control</button>
       <div class="pick" id="pickPanel" hidden>
         <h3>Pick horizons</h3>
@@ -84,7 +122,7 @@
       <div class="events">
         <button data-geo="33.3,35.3,0.85,1.10" aria-pressed="false"><b>Carboniferous → Permian</b><small>Variscan uplift and erosion; Zechstein rests on Namurian shale at Californië (Base Permian unconformity)</small></button>
         <button data-geo="33.8,35.3,0.70,0.82" aria-pressed="false"><b>Late Cretaceous</b><small>Inversion of the Roer Valley Graben; at Californië, Maastricht chalk rests on the Lower Buntsandstein</small></button>
-        <button data-geo="10.5,14.5,1.30,1.55" aria-pressed="false"><b>Paleocene–Eocene → Oligocene</b><small>Erosion at the base of the Oligocene; in ASTEN-GT-02 the Oligocene Berg Member rests on the Paleocene Reusel Member, and the whole Eocene is missing</small></button>
+        <button data-geo="10.5,14.5,1.30,1.55" aria-pressed="false"><b>Paleocene–Eocene → Oligocene</b><small>Erosion at the base of the Oligocene; in the graben the Oligocene rests on the Paleocene, and the whole Eocene is missing</small></button>
         <button data-geo="12.0,22.0,0.30,1.60" aria-pressed="false"><b>Late Oligocene → present</b><small>Graben subsidence along the Peel Boundary Fault, with up to 1000 m of throw and up to 2000 m of Cenozoic fill</small></button>
         <button data-geo="33.3,35.3,1.10,1.60" aria-pressed="false"><b>Dinantian</b><small>Carbonate platform; karst and fracture permeability produce warm water at Californië</small></button>
       </div>
@@ -126,18 +164,7 @@
     <!-- Logs and crossplots (internal stage 8, shown fourth) -->
     <div class="card" data-for="8" hidden>
       <h2>Logs and crossplots</h2>
-      <p class="small">SCAN029 is a 2D line with relative, not absolute, acoustic impedance. There are no shear or sonic logs and the wells are tied with processing velocities, CAL-GT-04 lies 0.5–1.4 km from the line with gamma ray from the mud log, and most attributes are averaged over 140 m and 62 ms, the scale of seismic facies. There is no inversion, Vp/Vs, intercept or gradient here, so the tool does not compare attributes with QI results; it shows how attributes can be tested against well logs before they are used alongside them.</p>
-      <div class="events" id="qiSteps">
-        <button data-qi="1" aria-pressed="false"><b>1. Zeeland against Epen at CAL-GT-04</b><small>The producing carbonate and the shale above it, split by a gamma ray cutoff, and the attributes that measure interval character separating them</small></button>
-        <button data-qi="2" aria-pressed="false"><b>2. Lithology or depth?</b><small>The same samples with a straight-line trend with time removed from gamma ray and from each attribute</small></button>
-        <button data-qi="3" aria-pressed="false"><b>3. Gamma ray classes from the Someren to the Boom members</b><small>ASTEN-GT-02, where gamma ray changes little with time; the cutoff slider sets the classes</small></button>
-        <button data-qi="4" aria-pressed="false"><b>4. Porosity over the whole logged interval</b><small>Density porosity against RMS amplitude, colored by two-way time; the averaging window slider changes the scale of the logs</small></button>
-        <button data-qi="5" aria-pressed="false"><b>5. Porosity with the trend removed</b><small>The same samples after a straight-line trend with time is subtracted</small></button>
-        <button data-qi="6" aria-pressed="false"><b>6. The well tie</b><small>Logs and tops moved 8 ms down; the tie shift slider moves them up to 16 ms either way</small></button>
-        <button data-qi="7" aria-pressed="false"><b>7. Two attributes and a polygon</b><small>Spectral ratio against far minus near, colored by class; a polygon marks the same combination along the whole line</small></button>
-        <button data-qi="8" aria-pressed="false"><b>8. Attributes chosen at the well, into the SOM</b><small>The four attributes that separate the classes most, skipping near-duplicates, go to Build a SOM</small></button>
-        <button data-qi="9" aria-pressed="false"><b>9. The Houthem Formation</b><small>The target at both wells, where the logs run out</small></button>
-      </div>
+      <p class="small">SCAN029 is a 2D line with relative, not absolute, acoustic impedance. There are no shear or sonic logs and the wells are tied with processing velocities, CAL-GT-04 lies 0.5–1.4 km from the line with gamma ray measured while drilling (LWD), and most attributes are averaged over 140 m and 62 ms, the scale of seismic facies. There is no inversion, Vp/Vs, intercept or gradient here, so the tool does not compare attributes with QI results; it shows how attributes can be tested against well logs before they are used alongside them.</p>
       <div class="seg qi-seg" role="group" aria-label="Well" id="qiWell">
         <button data-well="ASTEN-GT-02" aria-pressed="true">ASTEN-GT-02</button><button data-well="CAL-GT-04" aria-pressed="false">CAL-GT-04</button>
       </div>
@@ -263,7 +290,8 @@
     <!-- Someren prospect -->
     <div class="card" data-for="7" hidden>
       <h2>Someren prospect</h2>
-      <p class="small">ASTEN-GT-02, drilled in 1987, lies 0.1 km from the line inside the license. Its tops, from the 2021 TNO revision, are placed in two-way time with the migration velocities.</p>
+      <p class="small beforeReveal">The well inside the license is hidden until the reveal step of the exercise.</p>
+      <p class="small afterReveal" hidden>ASTEN-GT-02, drilled in 1987, lies 0.1 km from the line inside the license. Its tops, from the 2021 TNO revision, are placed in two-way time with the migration velocities.</p>
       <label class="field">Overlay opacity <input type="range" id="verdictOpacity" min="0" max="1" step="0.05" value="0.6"></label>
       <canvas id="somGridVerdict" width="268" height="268" aria-label="SOM neuron grid; click a neuron to switch it on or off"></canvas>
       <div class="row2"><button class="big" id="neuronsAllV">Show all neurons</button><button class="big" id="neuronsNoneV">Hide all neurons</button></div>
@@ -279,7 +307,7 @@
 
 <footer class="foot">
   <a href="methods.html" target="_blank" rel="noopener">Methods: data, attributes, SOM and SHAP</a> ·
-  Seismic: SCAN line L2EBN2020ASCAN029, EBN and TNO, via NLOG. Wells and logs: ASTEN-GT-02 and CAL-GT-04, NLOG.
+  Seismic: SCAN line L2EBN2020ASCAN029, EBN and TNO, via NLOG. Wells and logs: NLOG.
   Content CC BY-SA 4.0, Heather Bedle, University of Oklahoma.
 </footer>
 <script src="js/app.js"></script>
