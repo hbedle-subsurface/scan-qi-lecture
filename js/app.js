@@ -1657,24 +1657,22 @@
     1: () => { Object.assign(state.qi, { well: "CAL-GT-04", mode: "log", x: "rms_amplitude", y: "DRILL", color: "unit", unit: "all", win: 0, detrend: false, shift: 0, poly: [], closed: false, hover: null });
       setZoom("well"); setStage(8); qiChanged(); },
     2: () => { state.explore.picking = true; setZoom("study"); setStage(1); },
-    3: () => { Object.assign(state.qi, { well: "CAL-GT-04", mode: "log", y: "DRILL", color: "fmclass", unit: "all", win: 0, detrend: false, shift: 0, poly: [], closed: false, hover: null });
-      setZoom("well"); setStage(8); qiChanged(); },
-    4: () => { const prev = state.qi.well; state.qi.well = "CAL-GT-04"; const best = chooseForSom(1, "fm")[0]; state.qi.well = prev;
+    3: () => { const prev = state.qi.well; state.qi.well = "CAL-GT-04"; const best = chooseForSom(1, "fm")[0]; state.qi.well = prev;
       if (best) { state.attr = best; $("#attrSelect").value = best; drawColorbar(); syncPicks(); }
-      $("#exInfo").textContent = best ? `${meta.attributes[best].label} separates the two groups of formations at CAL-GT-04 most.` : "";
+      $("#exInfo").textContent = best ? `${meta.attributes[best].label} changes most at the top of the chalk at CAL-GT-04: Houthem and Maastricht formations against the Landen Clay to Swalmen members above, grouped by the well tops.` : "";
       setZoom("study"); setStage(3); },
-    5: () => { const prev = state.qi.well; state.qi.well = "CAL-GT-04"; const chosen = chooseForSom(4, "fm"); state.qi.well = prev;
+    4: () => { const prev = state.qi.well; state.qi.well = "CAL-GT-04"; const chosen = chooseForSom(4, "fm"); state.qi.well = prev;
       state.picked = new Set(chosen); syncPicks();
-      $("#exInfo").textContent = `Chosen at CAL-GT-04 from the formation groups: ${chosen.map((k) => meta.attributes[k].label).join(", ")}. Train the SOM in this stage.`;
+      $("#exInfo").textContent = `Chosen at CAL-GT-04 at the top of the chalk: ${chosen.map((k) => meta.attributes[k].label).join(", ")}. Train the SOM in this stage.`;
       setZoom("study"); setStage(4); },
-    6: () => { const r = run();
-      if (!r) { $("#exInfo").textContent = "Train a SOM first (step 5)."; setStage(4); return; }
+    5: () => { const r = run();
+      if (!r) { $("#exInfo").textContent = "Train a SOM first (step 4)."; setStage(4); return; }
       const set = new Set(neuronsAt(r, "CAL-GT-04")); state.explore.houthemNeurons = set;
       r.hidden = new Set([...Array(r.side * r.side).keys()].filter((k) => !set.has(k)));
       $("#exInfo").textContent = `The Houthem samples at CAL-GT-04 fall on ${set.size} neuron${set.size === 1 ? "" : "s"}; only those classes are shown along the line. The other neurons can be switched back on in the SOM grid.`;
       setZoom("study"); setStage(4); updateNeuronInfo?.(); },
-    7: () => { setStage(5); },
-    8: () => { state.explore.revealed = true; state.explore.picking = false; applyHidden(); revealReport(); setZoom("someren"); setStage(1); },
+    6: () => { setStage(5); },
+    7: () => { state.explore.revealed = true; state.explore.picking = false; applyHidden(); revealReport(); setZoom("someren"); setStage(1); },
   };
 
   function wireExplore() {
