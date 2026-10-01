@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=2026-10-01">
+<link rel="stylesheet" href="css/style.css?v=2026-10-01b">
 <script data-goatcounter="https://hbedle.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
@@ -23,14 +23,14 @@
   </div>
   <nav class="stages" aria-label="Stages">
     <a class="tag methods" href="methods.html" target="_blank" rel="noopener">Methods</a>
-    <button class="tag" data-stage="1" aria-current="true"><span>1</span>Line and wells</button>
-    <button class="tag" data-stage="2"><span>2</span>Geologic setting</button>
-    <button class="tag" data-stage="3"><span>3</span>Attributes</button>
-    <button class="tag" data-stage="8"><span>4</span>Logs and crossplots</button>
-    <button class="tag" data-stage="4"><span>5</span>Build a SOM</button>
-    <button class="tag" data-stage="5"><span>6</span>SHAP</button>
-    <button class="tag" data-stage="6"><span>7</span>Refine and compare</button>
-    <button class="tag" data-stage="7"><span>8</span>Someren prospect</button>
+    <button class="tag" data-stage="1" aria-current="true">Line and wells</button>
+    <button class="tag" data-stage="2">Geologic setting</button>
+    <button class="tag" data-stage="3">Attributes</button>
+    <button class="tag" data-stage="8">Logs and crossplots</button>
+    <button class="tag" data-stage="4">Build a SOM</button>
+    <button class="tag" data-stage="5">SHAP</button>
+    <button class="tag" data-stage="6">Refine and compare</button>
+    <button class="tag" data-stage="7">Someren prospect</button>
   </nav>
 </header>
 
@@ -246,7 +246,7 @@
     <!-- SHAP -->
     <div class="card" data-for="5" hidden>
       <h2>SHAP</h2>
-      <p class="small" id="shapRunLabel">Train a SOM in stage 5 first.</p>
+      <p class="small" id="shapRunLabel">Train a SOM in Build a SOM first.</p>
       <h3>Global SHAP: how far each attribute moves samples across the map</h3><button class="term help" data-term="helpShapGlobal">Help me read this plot</button>
       <canvas id="shapGlobal" width="268" height="200" aria-label="Mean SHAP magnitude by attribute"></canvas>
       <p class="small">Mean <button class="term" data-term="shap">SHAP</button> magnitude over 400 random samples, as a fraction of the map width. Axis fixed at 0–0.3.</p>
@@ -284,7 +284,7 @@
             <option value="5">25 (5 × 5)</option><option value="6" selected>36 (6 × 6)</option><option value="8">64 (8 × 8)</option><option value="10">100 (10 × 10)</option>
           </select>
         </label>
-        <p class="small">Window: <span id="windowText"></span> (set in stage 5)</p>
+        <p class="small">Window: <span id="windowText"></span> (set in Build a SOM)</p>
         <button class="big run" id="runSom2">Train the SOM again</button>
         <div class="progress" hidden><div class="bar"><span></span></div><p class="small"></p></div>
       </details>
@@ -313,6 +313,6 @@
   Seismic: SCAN line L2EBN2020ASCAN029, EBN and TNO, via NLOG. Wells and logs: NLOG.
   Content CC BY-SA 4.0, Heather Bedle, University of Oklahoma.
 </footer>
-<script src="js/app.js?v=2026-10-01"></script>
+<script src="js/app.js?v=2026-10-01b"></script>
 </body>
 </html>

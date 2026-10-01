@@ -37,7 +37,7 @@
 <p>Well tops are placed in two-way time with Dix interval velocities from the migration velocities at the velocity location nearest each point of the well path. None of the three wells has a sonic log or checkshot in the available data. CAL-GT-04 is projected with its deviation survey; the CAL-GT-01 path is estimated from its end-point offsets; ASTEN-GT-02 is vertical and 0.1 km from the line.</p>
 
 <h2>2. Attributes</h2>
-<p>Attributes are computed on every eighth CDP (20 m) and exported every 4 ms. Most are averaged over 140 m along the line and 62 ms in time, so that they describe the character of a seismic facies rather than individual reflections. Relative acoustic impedance and AVT are averaged over 140 m and 10 ms, the four stack amplitudes over 140 m only, and the three phase attributes are not averaged, because an average across the ±180° phase wrap has no physical meaning. Relative acoustic impedance, RMS amplitude and AVT were computed in AASPI; the other attributes were computed in Python. Each attribute's page in stage 3 gives what it measures and its original reference.</p>
+<p>Attributes are computed on every eighth CDP (20 m) and exported every 4 ms. Most are averaged over 140 m along the line and 62 ms in time, so that they describe the character of a seismic facies rather than individual reflections. Relative acoustic impedance and AVT are averaged over 140 m and 10 ms, the four stack amplitudes over 140 m only, and the three phase attributes are not averaged, because an average across the ±180° phase wrap has no physical meaning. Relative acoustic impedance, RMS amplitude and AVT were computed in AASPI; the other attributes were computed in Python. Each attribute's page in the Attributes stage gives what it measures and its original reference.</p>
 
 <h3>2.1 Distance and quadrant (DQ) attributes</h3>
 <p>Six DQ attributes are also available: DQ, ThetaPX, the signed isochron, the signed half isochron, and DQ averaged and summed over each half cycle. They were computed in AASPI from the near and far stacks, which were reversed to SEG normal polarity (an impedance increase positive) before the run, so their signs are the opposite of the seismic display here (Bedle et al., 2025a, 2025b; Choudhry et al., 2026a, 2026b). The files come from the scan-dq repository, where they are on the same 20 m traces at 2 ms from 0.15 to 2.0 s; here every second sample is kept, with no averaging along the line or in time. The DQ attributes therefore describe individual half cycles of the near stack, while most other attributes are averaged over 62 ms, and they have no values below 2.0 s, so they are left out of displays, crossplots and SOM windows there. A SOM that includes a DQ attribute is trained and classified down to 2.0 s. The StickOgram and quadrant number are steps of the workflow and not measurements of the rock, so they are not offered. The DQ workflow was developed and published on siliciclastic sections; the Chalk and the Dinantian carbonate on this line lie outside those settings. DQ attributes are shown on the color bars of the AASPI DQ attribute pamphlet, with unfilled wiggle traces of DQ at 2 ms drawn over the color. The DQ calculation is not part of this repository.</p>
@@ -108,7 +108,7 @@
 
 <h3>5.4 Limitations</h3>
 <ul>
-  <li><strong>Correlated attributes share credit.</strong> Two attributes carrying the same information split its SHAP value, so each can look less important than the information they share. The list of attributes correlating at 0.8 or more in stage 5 flags these.</li>
+  <li><strong>Correlated attributes share credit.</strong> Two attributes carrying the same information split its SHAP value, so each can look less important than the information they share. The list of attributes correlating at 0.8 or more in Build a SOM flags these.</li>
   <li><strong>Mixed samples.</strong> Putting one sample's value of an attribute next to another sample's values of the rest can create combinations that do not occur in the data.</li>
   <li><strong>Choice of output.</strong> A different explained quantity, such as the distance to the nearest prototype or the membership in one neuron, gives different SHAP values. Grid position was chosen because it is what the section colors show.</li>
   <li><strong>τ</strong> sets how quickly membership falls off with distance. A smaller τ makes the position jump between neurons; a larger τ pulls every position toward the center of the grid.</li>
@@ -128,7 +128,7 @@
   <li>Taner, M. T., F. Koehler, and R. E. Sheriff, 1979, Complex seismic trace analysis: Geophysics, 44, 1041–1063.</li>
   <li>van Lochem, H., M. ter Borgh, and H. Mijnlieff, 2019, Geological evaluation for the seismic acquisition programme for SCAN areas F and G: SCAN report, EBN and TNO.</li>
 </ul>
-<p class="small">Attribute references are listed with each attribute in stage 3 and in the repository README. Content CC BY-SA 4.0, Heather Bedle, University of Oklahoma.</p>
+<p class="small">Attribute references are listed with each attribute in the Attributes stage and in the repository README. Content CC BY-SA 4.0, Heather Bedle, University of Oklahoma.</p>
 </article>
 </main>
 <script data-goatcounter="https://hbedle.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>

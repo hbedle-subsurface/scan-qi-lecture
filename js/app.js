@@ -652,7 +652,7 @@
 
   function drawShapGlobal() {
     const c = $("#shapGlobal"), r = run();
-    $("#shapRunLabel").textContent = r ? `Run ${state.current + 1}: ${r.features.length} attributes, ${r.side * r.side} neurons` : "Train a SOM in stage 5 first.";
+    $("#shapRunLabel").textContent = r ? `Run ${state.current + 1}: ${r.features.length} attributes, ${r.side * r.side} neurons` : "Train a SOM in Build a SOM first.";
     if (!r || !r.importance) {
       const g = c.getContext("2d"); g.fillStyle = "#fffaf0"; g.fillRect(0, 0, c.width, c.height);
       g.fillStyle = "#5a5446"; g.font = "13px Barlow, Arial, sans-serif"; g.textAlign = "center"; g.fillText(r ? "Computing SHAP values…" : "", c.width / 2, c.height / 2); return;
